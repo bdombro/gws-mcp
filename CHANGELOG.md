@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- `gmail-attachment`: save one Gmail attachment to a local file (`call` caps results at 100 KB, too small for real attachments).
 - `drive-upload`: upload a local file to a Drive folder (by id or My Drive path, created when missing).
 
 ### Added

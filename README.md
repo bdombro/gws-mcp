@@ -23,6 +23,7 @@ Agents get one generic tool (`call`) that reaches every API `gws` knows, a `sche
 | `call` | `call` | Runs `gws <service> <resource…> <method>` with `params`, optional `body`, `fields` (partial-response mask), `pageAll`/`pageLimit`. Returns the parsed JSON; results over 100 KB come back as a truncation notice with a hint to use `fields` or narrower params. Annotated destructive/open-world: it can send mail, delete files, etc. |
 | `schema <service.resource.method> [--resolve-refs]` | `schema` | Shows a method's parameters and request/response schema (`gws schema`). `--resolve-refs` fails on recursive types (e.g. Gmail messages). |
 | `gmail-message <id>` | `gmail_message` | One message: from/to/cc/date/subject, body as text (`text/plain`, else HTML converted), attachments (filename, mimeType, size, attachmentId), labels, threadId. |
+| `gmail-attachment --message-id <id> --attachment-id <id> --out <path>` | `gmail_attachment` | Save one attachment (ids from `gmail-message`) to a local file. `call` can't, since its results are capped at 100 KB. |
 | `gmail-thread <id>` | `gmail_thread` | The same for every message in a thread. |
 | `drive-upload --file <path> [--folder-path 'A/B' \| --folder-id <id>] [--name] [--mime-type]` | `drive_upload` | Upload a local file to Drive; folder paths under My Drive are created when missing. |
 | `status` | `status` | App version and gws profile. |

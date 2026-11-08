@@ -1,7 +1,7 @@
 ---
 id: google-gws-mcp
 name: google-gws-mcp
-description: Call any Google Workspace API (Gmail, Calendar, Drive, Docs, Sheets, People/Contacts, Tasks, Chat, Forms, Keep, Meet…) through the gws CLI via the google-gws-mcp tools call, schema, gmail_message, gmail_thread and drive_upload. Use when reading or changing Google data and no more specific tool fits.
+description: Call any Google Workspace API (Gmail, Calendar, Drive, Docs, Sheets, People/Contacts, Tasks, Chat, Forms, Keep, Meet…) through the gws CLI via the google-gws-mcp tools call, schema, gmail_message, gmail_thread, gmail_attachment and drive_upload. Use when reading or changing Google data and no more specific tool fits.
 enabled: true
 ---
 
@@ -15,6 +15,7 @@ MCP tools over the `gws` Google Workspace CLI. Same commands on the CLI: `google
 - **`schema`** — `method: "service.resource.method"` (e.g. `gmail.users.messages.list`, `people.people.connections.list`, `tasks.tasks.insert`) returns parameters and request/response shapes. Use it before an unfamiliar `call`.
 - **`drive_upload`** — `file` (local path), `folder-path` (My Drive path, created when missing) or `folder-id`, optional `name`, `mime-type`. Uploads a file from this machine.
 - **`gmail_message`** — `id`: readable headers, text body, attachments, labels, threadId.
+- **`gmail_attachment`** — `message-id`, `attachment-id` (from `gmail_message`), `out` (local path): saves one attachment to a file on this machine.
 - **`gmail_thread`** — `id` (threadId): the same for every message.
 - **`status`** — version and gws profile.
 
