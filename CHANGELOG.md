@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-08
+
 ### Security
 
 - `gmail-attachment`: always saves to `~/Downloads/gws/<messageId>/<sanitized name>` with no overwrite; the `out` option is replaced by an optional `filename`.
