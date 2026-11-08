@@ -1,0 +1,17 @@
+{
+  "name": "google-gws-mcp",
+  "displayName": "GoogleGwsMcp",
+  "description": "Call any Google Workspace API (Gmail, Calendar, Drive, Docs, Sheets, People, Tasks…) through the gws CLI over MCP.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Brian Dombrowski"
+  },
+  "homepage": "https://github.com/bdombro/google-gws-mcp",
+  "repository": "https://github.com/bdombro/google-gws-mcp",
+  "mcpServers": {
+    "google-gws-mcp": {
+      "command": "node",
+      "args": ["${CURSOR_PLUGIN_ROOT}/dist/google-gws-mcp.mjs", "mcp"]
+    }
+  }
+}

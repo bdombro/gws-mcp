@@ -1,0 +1,18 @@
+{
+  "name": "google-gws-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Call any Google Workspace API (Gmail, Calendar, Drive, Docs, Sheets, People, Tasks…) through the gws CLI over MCP.",
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.0",
+    "@types/node": "^22",
+    "argsbarg": "^8.2.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^7.0.2",
+    "zod": "^4"
+  }
+}
