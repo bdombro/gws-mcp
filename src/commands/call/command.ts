@@ -70,7 +70,7 @@ export type CallInput = z.infer<typeof CallInput>;
 export const callCommand = command({
   key: "call",
   description:
-    "Call any Google Workspace API method (gws <service> <resource…> <method>) and return the JSON response. Can read or write.",
+    "Call any Google Workspace API method (gws <service> <resource…> <method>) and return the JSON response. Can read or write. Blocked for safety: sending Gmail (messages.send, drafts.send), Gmail filters, forwarding addresses, delegates and auto-forwarding, Drive permissions.create/update and files.delete, Calendar acl.*, and script.scripts.run. For sharing use gdocsmith, or ask Brian.",
   kind: "document",
   inputSchema: CallInput,
   mcpTool: {
@@ -79,6 +79,12 @@ export const callCommand = command({
   notes:
     'Example: {"service":"gmail","resource":["users","messages"],"method":"list","params":{"userId":"me","q":"is:unread","maxResults":5},"fields":"messages(id,threadId)"}. Discover parameters with the schema tool (e.g. "gmail.users.messages.list").',
   handler: async (ctx) => {
+    const blocked = blockedMethod(ctx.inputs);
+    if (blocked) {
+      throw new Error(
+        `Blocked: ${blocked} is not allowed through call (sending mail, Gmail filters/forwarding/delegates, Drive sharing and deletes, Calendar ACLs and Apps Script runs are refused). Use gdocsmith for sharing, or ask Brian.`,
+      );
+    }
     const result = await runGws(ctx.locals.gws, buildCallArgs(ctx.inputs), {
       ndjson: ctx.inputs.pageAll,
       signal: ctx.mcp?.signal,
@@ -90,6 +96,40 @@ export const callCommand = command({
     ) as Record<string, unknown>;
   },
 });
+
+/** Methods `call` refuses, as dotted `service.resource….method` paths; a trailing `*` blocks everything below. */
+export const BLOCKED_METHODS = [
+  "gmail.users.messages.send",
+  "gmail.users.drafts.send",
+  "gmail.users.settings.filters.*",
+  "gmail.users.settings.forwardingAddresses.*",
+  "gmail.users.settings.delegates.*",
+  "gmail.users.settings.updateAutoForwarding",
+  "drive.permissions.create",
+  "drive.permissions.update",
+  "drive.files.delete",
+  "calendar.acl.*",
+  "script.scripts.run",
+];
+
+/**
+ * The blocked method path a call targets (e.g. "gmail.users.messages.send"), or undefined.
+ * Service, resource and method are joined into one dotted path and compared case-insensitively
+ * with `-`/`_` removed, so `Gmail`, `forwarding-addresses` and extra or shifted segments cannot
+ * dodge the list (a rule also matches when the call path just starts with it).
+ */
+export function blockedMethod(
+  /** The `call` input. */
+  input: Pick<CallInput, "method" | "resource" | "service">,
+): string | undefined {
+  const path = [input.service, ...input.resource, input.method].map(normalizeSegment);
+  return BLOCKED_METHODS.find((rule) => {
+    const parts = rule.split(".").map(normalizeSegment);
+    const wildcard = parts.at(-1) === "*";
+    const prefix = wildcard ? parts.slice(0, -1) : parts;
+    return prefix.every((part, i) => path[i] === part) && (wildcard ? path.length > prefix.length : true);
+  });
+}
 
 /** Builds gws argv (without the profile flag) for a `call` body. */
 export function buildCallArgs(input: CallInput): string[] {
@@ -106,4 +146,9 @@ export function buildCallArgs(input: CallInput): string[] {
     if (input.pageLimit) args.push("--page-limit", String(input.pageLimit));
   }
   return args;
+}
+
+/** Lowercases a path segment and drops `-`/`_` so spelling variants compare equal. */
+function normalizeSegment(segment: string): string {
+  return segment.toLowerCase().replace(/[-_]/g, "");
 }

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- `gmail-attachment`: always saves to `~/Downloads/gws/<messageId>/<sanitized name>` with no overwrite; the `out` option is replaced by an optional `filename`.
+- `drive-upload`: refuses files outside `$HOME` / OS temp dirs, hidden paths, `~/Library` and non-regular files.
+- `call`: code-level blocklist (send mail, Gmail filters/forwarding/delegates, Drive permissions create/update and files.delete, Calendar acl, script run).
+- HTML-to-text drops hidden elements (inline style, `hidden` attribute); MCP instructions mark email content as untrusted.
+- HTTP server disabled.
+
 - `gmail-attachment`: save one Gmail attachment to a local file (`call` caps results at 100 KB, too small for real attachments).
 - `drive-upload`: upload a local file to a Drive folder (by id or My Drive path, created when missing).
 

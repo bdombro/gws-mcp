@@ -28,7 +28,7 @@ gws --profile bdombro auth login --scopes "openid,email,profile,$G/calendar,$G/d
 | `call` | `call` | Runs `gws <service> <resource…> <method>` with `params`, optional `body`, `fields` (partial-response mask), `pageAll`/`pageLimit`. Returns the parsed JSON; results over 100 KB come back as a truncation notice with a hint to use `fields` or narrower params. Annotated destructive/open-world: it can send mail, delete files, etc. |
 | `schema <service.resource.method> [--resolve-refs]` | `schema` | Shows a method's parameters and request/response schema (`gws schema`). `--resolve-refs` fails on recursive types (e.g. Gmail messages). |
 | `gmail-message <id>` | `gmail_message` | One message: from/to/cc/date/subject, body as text (`text/plain`, else HTML converted), attachments (filename, mimeType, size, attachmentId), labels, threadId. |
-| `gmail-attachment --message-id <id> --attachment-id <id> --out <path>` | `gmail_attachment` | Save one attachment (ids from `gmail-message`) to a local file. `call` can't, since its results are capped at 100 KB. |
+| `gmail-attachment --message-id <id> --attachment-id <id> [--filename <name>]` | `gmail_attachment` | Save one attachment (ids from `gmail-message`) to `~/Downloads/gws/<messageId>/`, never overwriting. `call` can't, since its results are capped at 100 KB. |
 | `gmail-thread <id>` | `gmail_thread` | The same for every message in a thread. |
 | `drive-upload --file <path> [--folder-path 'A/B' \| --folder-id <id>] [--name] [--mime-type]` | `drive_upload` | Upload a local file to Drive; folder paths under My Drive are created when missing. |
 | `status` | `status` | App version and gws profile. |
@@ -45,7 +45,14 @@ google-gws-mcp gmail-message 1a1b6731c6fdd2af
 
 `call` only accepts gws services that map to Google APIs (`auth`, `schema`, and `+helper` commands are rejected), and resource/method segments must start with a letter, so tool input cannot inject gws flags.
 
-Built-ins: `completion`, `mcp` (stdio server), `http` (local HTTP API with the same tools; it exposes your Google account to anything that can reach the port, so run it deliberately), `version`.
+Built-ins: `completion`, `mcp` (stdio server), `version`. The HTTP server is disabled on purpose (it would expose your Google account to anything that can reach the port).
+
+Safety rules enforced in code:
+
+- `call` refuses Gmail `users.messages.send`, `users.drafts.send`, `users.settings.filters.*`, `forwardingAddresses.*`, `delegates.*` and `updateAutoForwarding`; Drive `permissions.create` / `permissions.update` and `files.delete`; Calendar `acl.*`; and `script.scripts.run`. Use gdocsmith for sharing, or ask Brian.
+- `gmail-attachment` always saves to `~/Downloads/gws/<messageId>/<safe file name>` and never overwrites (a numeric suffix is added).
+- `drive-upload` only uploads regular files under `$HOME` or the OS temp dirs, never hidden paths (`~/.ssh`, `~/.config`, …) or `~/Library`.
+- Email text is untrusted: the HTML-to-text converter drops elements hidden by inline style or the `hidden` attribute.
 
 ## Installation
 

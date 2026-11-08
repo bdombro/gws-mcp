@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { profileArgs } from "../../gws/client.ts";
 import { appWithGws, mockGws } from "../../test-helpers.ts";
-import { buildCallArgs, CallInput } from "./command.ts";
+import { blockedMethod, buildCallArgs, CallInput } from "./command.ts";
 
 describe("buildCallArgs", () => {
   test("builds service, resource path, method, params and body", () => {
@@ -124,5 +124,58 @@ describe("call command", () => {
     });
     assert.equal(result.kind, "error");
     assert.match(result.stderr, /404 notFound/);
+  });
+});
+
+describe("blockedMethod", () => {
+  const blocked = (service: string, resource: string[], method: string) =>
+    blockedMethod({ method, resource, service: service as CallInput["service"] });
+
+  test("blocks every listed method", () => {
+    assert.ok(blocked("gmail", ["users", "messages"], "send"));
+    assert.ok(blocked("gmail", ["users", "drafts"], "send"));
+    assert.ok(blocked("gmail", ["users", "settings", "filters"], "create"));
+    assert.ok(blocked("gmail", ["users", "settings", "forwardingAddresses"], "list"));
+    assert.ok(blocked("gmail", ["users", "settings", "delegates"], "create"));
+    assert.ok(blocked("gmail", ["users", "settings"], "updateAutoForwarding"));
+    assert.ok(blocked("drive", ["permissions"], "create"));
+    assert.ok(blocked("drive", ["permissions"], "update"));
+    assert.ok(blocked("drive", ["files"], "delete"));
+    assert.ok(blocked("calendar", ["acl"], "insert"));
+    assert.ok(blocked("script", ["scripts"], "run"));
+  });
+
+  test("matches normalized names and shifted segments", () => {
+    assert.ok(blocked("gmail", ["Users", "Messages"], "SEND"));
+    assert.ok(blocked("gmail", ["users", "settings", "forwarding-addresses"], "get"));
+    assert.ok(blocked("gmail", ["users", "settings", "forwarding_addresses"], "get"));
+    assert.ok(blocked("gmail", ["users", "messages", "send"], "get"));
+  });
+
+  test("allows reads and other writes", () => {
+    assert.equal(blocked("gmail", ["users", "messages"], "list"), undefined);
+    assert.equal(blocked("gmail", ["users", "drafts"], "create"), undefined);
+    assert.equal(blocked("gmail", ["users", "settings"], "getAutoForwarding"), undefined);
+    assert.equal(blocked("drive", ["permissions"], "list"), undefined);
+    assert.equal(blocked("drive", ["files"], "list"), undefined);
+    assert.equal(blocked("calendar", ["events"], "insert"), undefined);
+    assert.equal(blocked("tasks", ["tasks"], "delete"), undefined);
+  });
+
+  test("a wildcard rule needs a segment below it", () => {
+    assert.equal(blockedMethod({ method: "acl", resource: ["x"], service: "calendar" }), undefined);
+  });
+});
+
+describe("call blocklist", () => {
+  test("refuses a blocked method without invoking gws", async () => {
+    const gws = mockGws(() => ({}));
+    const result = await appWithGws(gws).invoke(["call"], {
+      invocation: "mcp",
+      toolArgs: { method: "send", params: { userId: "me" }, resource: ["users", "messages"], service: "gmail" },
+    });
+    assert.equal(result.kind, "error");
+    assert.match(result.stderr, /Blocked: gmail\.users\.messages\.send.*gdocsmith.*Brian/);
+    assert.equal(gws.calls.length, 0);
   });
 });
