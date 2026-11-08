@@ -69,6 +69,8 @@ Settings → Plugins → Team Marketplaces → Import `https://github.com/bdombr
 
 Both manifests run `node dist/google-gws-mcp.mjs mcp`; the bundle is committed, so a fresh clone needs no install step.
 
+Errors go to this plugin's Bugsink project (bugsink.btek.cc); set `BUGSINK_DSN=""` to disable.
+
 ## Development
 
 Node ≥ 22.18, npm, [just](https://just.systems).
