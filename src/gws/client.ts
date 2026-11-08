@@ -16,8 +16,8 @@ export type GwsRun = {
   stdout: string;
 };
 
-/** Spawns `gws` with argv (profile flag included) and returns its raw output. */
-export type GwsRunner = (args: string[], signal?: AbortSignal) => Promise<GwsRun>;
+/** Spawns `gws` with argv (profile flag included), optionally in `cwd`, and returns its raw output. */
+export type GwsRunner = (args: string[], signal?: AbortSignal, cwd?: string) => Promise<GwsRun>;
 
 /** Thrown when gws exits non-zero; `message` carries the API error text. */
 export class GwsError extends Error {
@@ -30,10 +30,10 @@ export function attachGws(ctx: InvokeHookContext): void {
 }
 
 /** Real runner: `execFile` of `$GWS_BIN` (default `gws`), no shell. */
-export const execGws: GwsRunner = (args, signal) =>
+export const execGws: GwsRunner = (args, signal, cwd) =>
   new Promise((resolve, reject) => {
     const bin = process.env.GWS_BIN || "gws";
-    execFile(bin, args, { encoding: "utf8", maxBuffer: 256 * 1024 * 1024, signal }, (err, stdout, stderr) => {
+    execFile(bin, args, { encoding: "utf8", maxBuffer: 256 * 1024 * 1024, signal, cwd }, (err, stdout, stderr) => {
       if (err && typeof err.code === "string") {
         const hint = err.code === "ENOENT" ? ` (is ${bin} installed and on PATH? set GWS_BIN to override)` : "";
         reject(new GwsError(`Could not run ${bin}: ${err.message}${hint}`));
@@ -61,9 +61,9 @@ export function profileArgs(profile: string | undefined = process.env.GWS_PROFIL
 export async function runGws(
   runner: GwsRunner,
   args: string[],
-  opts: { ndjson?: boolean; signal?: AbortSignal } = {},
+  opts: { ndjson?: boolean; signal?: AbortSignal; cwd?: string } = {},
 ): Promise<unknown> {
-  const run = await runner([...profileArgs(), ...args], opts.signal);
+  const run = await runner([...profileArgs(), ...args], opts.signal, opts.cwd);
   const stdout = run.stdout.trim();
   if (run.exitCode !== 0) throw new GwsError(describeFailure(run, stdout));
   if (!stdout) return {};

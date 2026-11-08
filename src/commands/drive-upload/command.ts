@@ -4,6 +4,7 @@ given by id or by a "My Drive" path that is created when missing. Local-only by 
 file from this machine.
 */
 
+import { basename, dirname, resolve } from "node:path";
 import { command, OptionKind } from "argsbarg";
 import { z } from "zod";
 import { type GwsRunner, runGws } from "../../gws/client.ts";
@@ -44,18 +45,24 @@ export const driveUploadCommand = command({
       (ctx.inputs["folder-id"] as string | undefined) ??
       (await ensureFolderPath(ctx.locals.gws, (ctx.inputs["folder-path"] as string | undefined) ?? ""));
     const mime = ctx.inputs["mime-type"] as string | undefined;
-    const created = (await runGws(ctx.locals.gws, [
-      "drive",
-      "files",
-      "create",
-      "--upload",
-      file,
-      ...(mime ? ["--upload-content-type", mime] : []),
-      "--params",
-      JSON.stringify({ fields: "id,name,webViewLink" }),
-      "--json",
-      JSON.stringify({ name, parents: [folderId] }),
-    ])) as { id: string; name: string; webViewLink?: string };
+    // gws only uploads files inside its working directory, so run it from the file's folder.
+    const absolute = resolve(file);
+    const created = (await runGws(
+      ctx.locals.gws,
+      [
+        "drive",
+        "files",
+        "create",
+        "--upload",
+        basename(absolute),
+        ...(mime ? ["--upload-content-type", mime] : []),
+        "--params",
+        JSON.stringify({ fields: "id,name,webViewLink" }),
+        "--json",
+        JSON.stringify({ name, parents: [folderId] }),
+      ],
+      { cwd: dirname(absolute) },
+    )) as { id: string; name: string; webViewLink?: string };
     return { id: created.id, name: created.name, folderId, webViewLink: created.webViewLink };
   },
 });
