@@ -1,46 +1,32 @@
 ---
 id: google-gws-mcp
 name: google-gws-mcp
-description: Operates the google-gws-mcp CLI (echo, render-json, status, workspaces :id delete, workspaces :id get, and 4 more). Use when the user mentions google-gws-mcp, echo, render-json, status, or related tasks.
+description: Call any Google Workspace API (Gmail, Calendar, Drive, Docs, Sheets, People/Contacts, Tasks, Chat, Forms, Keep, Meet…) through the gws CLI via the google-gws-mcp tools call, schema, gmail_message and gmail_thread. Use when reading or changing Google data and no more specific tool fits.
 enabled: true
 ---
 
 # google-gws-mcp
 
-Call any Google Workspace API (Gmail, Calendar, Drive, Docs, Sheets, People, Tasks…) through the gws CLI over MCP. (Zod schemas, typed commands, REST CRUD)
+MCP tools over the `gws` Google Workspace CLI. Same commands on the CLI: `google-gws-mcp <command>`.
 
-## Execution
+## Tools
 
-Invoke via shell:
+- **`call`** — any API method. Body: `service` (e.g. `gmail`, `calendar`, `drive`, `people`, `tasks`), `resource` (path array, e.g. `["users","messages"]`), `method` (e.g. `list`, `get`, `insert`), `params` (path + query), optional `body` (POST/PATCH/PUT), `fields`, `pageAll`, `pageLimit`. Can write: sending mail, deleting files, editing events. Confirm with the user before any write.
+- **`schema`** — `method: "service.resource.method"` (e.g. `gmail.users.messages.list`, `people.people.connections.list`, `tasks.tasks.insert`) returns parameters and request/response shapes. Use it before an unfamiliar `call`.
+- **`gmail_message`** — `id`: readable headers, text body, attachments, labels, threadId.
+- **`gmail_thread`** — `id` (threadId): the same for every message.
+- **`status`** — version and gws profile.
 
-```bash
-google-gws-mcp <subcommand> [options] [args]
-```
+## Workflow
 
-## Options & Help Discovery
+1. Find the method with `schema` (service, resource path, required params).
+2. `call` with a `fields` mask (e.g. `"messages(id,threadId),nextPageToken"`, `"files(id,name,mimeType)"`, `"connections(names,emailAddresses)"`) and a small `maxResults`/`pageSize`.
+3. Read email with `gmail_message` / `gmail_thread` instead of decoding `call` payloads.
 
-- Run `google-gws-mcp <subcommand> --help` to inspect flags, choices, and positional arguments before running unfamiliar subcommands.
-- Run `google-gws-mcp --help` at the root for top-level options and command routing.
+## Pitfalls
 
-## Commands
-
-- **`google-gws-mcp echo`** — Echo a message (MCP-friendly command).
-- **`google-gws-mcp render-json`** — Echo a JSON message (schema-first JSON command demo).
-- **`google-gws-mcp status`** — Show app version.
-- **`google-gws-mcp workspaces :id delete`** — Delete a workspace.
-- **`google-gws-mcp workspaces :id get`** — Get one workspace.
-- **`google-gws-mcp workspaces :id patch`** — Patch a workspace name.
-- **`google-gws-mcp workspaces :id put`** — Replace a workspace.
-- **`google-gws-mcp workspaces get`** — List workspaces.
-- **`google-gws-mcp workspaces post`** — Create a workspace.
-
-## Workflow & Pitfalls
-
-- Always run `google-gws-mcp <subcommand> --help` instead of guessing options or reading large doc files.
-- Pass `--` before arguments that look like flags.
-- Pass `--json` when machine-readable structured output is supported.
-
-## Install location
-
-- **Agent plugin:** plugins built with `google-gws-mcp mcp bundle` ship this skill.
-- **Manual:** copy or symlink `skills/google-gws-mcp/` into your agent's skill directory (for example `~/.agents/skills/google-gws-mcp/` or `~/.claude/skills/google-gws-mcp/`).
+- Results over 100 KB come back as `{ truncated: true, hint, preview }`: narrow with `fields` or params.
+- `pageAll` wraps results as `{ pages: [...] }`; `nextPageToken` is added to `fields` automatically.
+- People API reads need `personFields` (e.g. `"names,emailAddresses,phoneNumbers"`); Tasks uses `tasklist: "@default"` for the default list.
+- `schema` with `resolve-refs` fails on recursive types (Gmail messages); omit it.
+- The gws profile comes from `GWS_PROFILE` (default `bdombro`).

@@ -1,71 +1,69 @@
 # google-gws-mcp
 
-Call any Google Workspace API (Gmail, Calendar, Drive, Docs, Sheets, People, Tasks…) through the gws CLI over MCP. (Zod schemas, typed commands, in-repo manifests).
+Call any Google Workspace API (Gmail, Calendar, Drive, Docs, Sheets, People, Tasks…) through the [`gws` CLI](https://github.com/googleworkspace/cli) over MCP.
 
-## Overview
+Agents get one generic tool (`call`) that reaches every API `gws` knows, a `schema` tool to discover parameters, and readable Gmail tools that turn MIME/HTML into plain text.
 
-`google-gws-mcp` packages an MCP server and agent skills directly for Cursor and Claude Code marketplaces:
+## Requirements
 
-- **Cursor Plugin**: inline MCP configuration in `.cursor-plugin/plugin.json` runs `node ${CURSOR_PLUGIN_ROOT}/dist/google-gws-mcp.mjs mcp`.
-- **Claude Code Plugin**: inline MCP configuration in `.claude-plugin/plugin.json` runs `node ${CLAUDE_PLUGIN_ROOT}/dist/google-gws-mcp.mjs mcp`.
-- **In-repo skills**: `skills/google-gws-mcp/SKILL.md` discovered and loaded by agent platforms.
-- **Committed Node bundle**: `dist/google-gws-mcp.mjs` is self-contained (dependencies and schemas bundled), so a fresh clone runs with no install step.
+- Node ≥ 20 on PATH.
+- `gws` installed and authenticated (`gws auth login`). The server spawns it without a shell.
+
+## Configuration (env)
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `GWS_PROFILE` | `bdombro` | Passed as `gws --profile <name>` (first argument, for the profile-aware `gws` shim). Set to an empty string to omit the flag when using the stock `gws` binary. |
+| `GWS_BIN` | `gws` | Path or name of the `gws` executable. |
+
+## Commands (CLI and MCP tools)
+
+| Command | MCP tool | What it does |
+| --- | --- | --- |
+| `call` | `call` | Runs `gws <service> <resource…> <method>` with `params`, optional `body`, `fields` (partial-response mask), `pageAll`/`pageLimit`. Returns the parsed JSON; results over 100 KB come back as a truncation notice with a hint to use `fields` or narrower params. Annotated destructive/open-world: it can send mail, delete files, etc. |
+| `schema <service.resource.method> [--resolve-refs]` | `schema` | Shows a method's parameters and request/response schema (`gws schema`). `--resolve-refs` fails on recursive types (e.g. Gmail messages). |
+| `gmail-message <id>` | `gmail_message` | One message: from/to/cc/date/subject, body as text (`text/plain`, else HTML converted), attachments (filename, mimeType, size, attachmentId), labels, threadId. |
+| `gmail-thread <id>` | `gmail_thread` | The same for every message in a thread. |
+| `status` | `status` | App version and gws profile. |
+
+CLI examples:
+
+```bash
+google-gws-mcp call '{"service":"gmail","resource":["users","messages"],"method":"list","params":{"userId":"me","q":"is:unread","maxResults":5},"fields":"messages(id,threadId)"}'
+google-gws-mcp call '{"service":"people","resource":["people","connections"],"method":"list","params":{"resourceName":"people/me","personFields":"names,emailAddresses","pageSize":50}}'
+google-gws-mcp call '{"service":"tasks","resource":["tasklists"],"method":"list"}'
+google-gws-mcp schema tasks.tasks.insert
+google-gws-mcp gmail-message 1a1b6731c6fdd2af
+```
+
+`call` only accepts gws services that map to Google APIs (`auth`, `schema`, and `+helper` commands are rejected), and resource/method segments must start with a letter, so tool input cannot inject gws flags.
+
+Built-ins: `completion`, `mcp` (stdio server), `http` (local HTTP API with the same tools; it exposes your Google account to anything that can reach the port, so run it deliberately), `version`.
 
 ## Installation
 
-Requires Node >=20 on the host's PATH. Nothing is installed at startup; stdout contains only MCP messages. Maintainers develop, test, and bundle (esbuild) with Node ≥ 22.18, npm, and [just](https://just.systems); no Bun required.
-
-The in-repo example retains its `argsbarg: file:../..` development dependency. Before distributing a standalone copy, resolve that dependency for the destination repository and regenerate its lockfile; the parent-checkout path is not portable.
-
-### Cursor
-
-Recommended: import directly from GitHub — Cursor Dashboard → **Settings → Plugins → Team Marketplaces → Import**, then enter `https://github.com/bdombro/google-gws-mcp` (subdirectory `examples/agent-plugin` once copied to its own repo). Once published to the [official marketplace](https://cursor.com/marketplace/publish), install via `/add-plugin google-gws-mcp` or the Customize sidebar.
-
 ### Claude Code
 
-Recommended: add the GitHub repo as a marketplace, then install:
-
 ```bash
-/plugin marketplace add <owner>/<repo>
+/plugin marketplace add bdombro/google-gws-mcp
 /plugin install google-gws-mcp@google-gws-mcp
 ```
 
-The marketplace name comes from `.claude-plugin/marketplace.json`, not the repository name.
+### Cursor
 
-Once merged into [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official), install via `/plugin install google-gws-mcp@claude-plugins-official`.
+Settings → Plugins → Team Marketplaces → Import `https://github.com/bdombro/google-gws-mcp`, or locally `just plugin-cursor-upsert`.
 
-## Commands
+Both manifests run `node dist/google-gws-mcp.mjs mcp`; the bundle is committed, so a fresh clone needs no install step.
 
-- `google-gws-mcp echo` — Echo text back to stdout or inspect flags.
-- `google-gws-mcp render-json` — Process structured JSON payloads with schema validation.
-- `google-gws-mcp status` — Show application version with a Zod output schema (`--json`).
-- `google-gws-mcp workspaces` — Manage workspace resources (REST CRUD with in-memory SQLite).
+## Development
 
-### Built-in commands
-
-- `google-gws-mcp completion` — Print shell tab-completion scripts (bash, zsh, fish).
-- `google-gws-mcp mcp` — Start the Model Context Protocol (stdio) server for AI coding agents.
-- `google-gws-mcp version` — Display version information.
-
-## Contributing / Local Development
+Node ≥ 22.18, npm, [just](https://just.systems).
 
 ```bash
-git clone https://github.com/bdombro/google-gws-mcp.git
-cd bun-argsbarg/examples/agent-plugin
-
 just setup
-just test
-
-# Rebuild the committed Node bundle and run the MCP server from it
-just build
-node dist/google-gws-mcp.mjs mcp
-
-# Link into local Cursor plugins for live testing
-just plugin-cursor-upsert
-
-# Register this checkout as a marketplace and install in Claude Code
-just plugin-claude-install
+just test     # biome + tsc + node:test (gws is mocked; no network)
+just build    # rebuild dist/google-gws-mcp.mjs; commit it with source changes
+just run gmail-message <id>
 ```
 
-Restart Claude Code after installing. Use `node src/index.ts <command>` for CLI commands from source. Commit `dist/google-gws-mcp.mjs` whenever source changes (`just build`). Release with `just release <major|minor|patch>` (no prompt; commits all changes, tags, pushes and creates the GitHub release).
-
+`src/html-to-text.ts` is a zero-dependency email HTML-to-text converter, reusable on its own.

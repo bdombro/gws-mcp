@@ -1,11 +1,8 @@
-import type { AppDb } from "../db/index.ts";
+import type { GwsRunner } from "../gws/client.ts";
 
 declare module "argsbarg" {
   interface Locals {
-    db: AppDb;
-  }
-
-  interface ServerState {
-    db?: AppDb;
+    /** Spawns gws; replaced with a mock in tests. */
+    gws: GwsRunner;
   }
 }

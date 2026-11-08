@@ -37,8 +37,11 @@ When adding or changing commands, schemas, or MCP exposure:
 | `src/index.ts` | Entry: `await app.run()` | Command handlers, business logic |
 | `src/app.ts` | App spec: `commands: […]` (alphabetical by key) | Command handlers, business logic |
 | `src/create-identity.ts` | Key, release repo, description (rewritten by `argsbarg create`) | Anything else |
-| `src/types/` | Module augmentations (`argsbarg.d.ts`: `Locals`, `ServerState`) | Runtime logic |
-| `src/db/` | `AppDb` (SQLite connect, migrate, domain access), `migrations/*.sql` | Command handlers |
+| `src/types/` | Module augmentations (`argsbarg.d.ts`: `Locals.gws`) | Runtime logic |
+| `src/gws/` | gws runner (`client.ts`: argv, profile, spawn, JSON/NDJSON parse, errors) and result size cap (`cap.ts`) | Command handlers |
+| `src/gmail/` | Gmail MIME walking and message summaries (`mime.ts`) | Spawning gws |
+| `src/html-to-text.ts` | Zero-dependency email HTML-to-text | Gmail or gws specifics |
+| `src/test-helpers.ts` | Mock gws runner and app wiring for tests | Production paths |
 | `src/commands/<name>/` | One command: `command.ts` (with its Zod schemas), colocated `*.test.ts` | Shared helpers (lift them out) |
 | `scripts/` | Dev tooling (release) | Production command paths |
 
@@ -67,4 +70,7 @@ When adding or changing commands, schemas, or MCP exposure:
 
 ## App conventions
 
-Replace with app-specific bullets.
+- Every gws call goes through `runGws(ctx.locals.gws, args)`; `attachGws` (app `beforeInvoke`) sets the real runner and tests swap in `mockGws` via `appWithGws`. Never spawn gws elsewhere, never use a shell.
+- `--profile $GWS_PROFILE` (default `bdombro`) is prepended by `runGws`; it must be gws's first argument (the profile shim only reads it there).
+- Tests never hit the network. Manual smoke tests against real gws must be read-only.
+- Generic results go through `capJson` so agents get a hint instead of a huge payload.

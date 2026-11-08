@@ -1,36 +1,23 @@
 /*
-Status leaf — demonstrates outputSchema.
+status: report the app version and the gws profile in use.
 */
 
-import { command, OptionKind } from "argsbarg";
+import { command } from "argsbarg";
 import { z } from "zod";
+import { profileArgs } from "../../gws/client.ts";
 
-/** JSON stdout for `google-gws-mcp status --json`. */
-export const StatusJsonOutput = z.strictObject({
-  version: z.string().describe("App version from program root."),
+/** JSON result of `google-gws-mcp status`. */
+export const StatusOutput = z.strictObject({
+  profile: z.string().describe("gws profile passed as --profile (GWS_PROFILE, default bdombro); empty when omitted."),
+  version: z.string().describe("App version."),
 });
+export type StatusOutput = z.infer<typeof StatusOutput>;
 
-/** `status --json` payload. */
-export type StatusJsonOutput = z.infer<typeof StatusJsonOutput>;
-
-/** Prints the app version (JSON with `--json`). */
+/** Returns the app version and gws profile. */
 export const statusCommand = command({
   key: "status",
-  description: "Show app version.",
-  options: [
-    {
-      name: "json",
-      description: "Emit JSON.",
-      kind: OptionKind.Presence,
-    },
-  ],
-  outputSchema: StatusJsonOutput,
-  handler: (ctx) => {
-    const out: StatusJsonOutput = { version: ctx.spec.version };
-    if (ctx.hasFlag("json")) {
-      console.log(JSON.stringify(out, null, 2));
-    } else {
-      console.log(`version=${out.version}`);
-    }
-  },
+  description: "Show the app version and the gws profile in use.",
+  mcpTool: { annotations: { openWorldHint: false, readOnlyHint: true } },
+  outputSchema: StatusOutput,
+  handler: (ctx): StatusOutput => ({ profile: profileArgs()[1] ?? "", version: ctx.spec.version }),
 });
