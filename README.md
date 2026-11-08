@@ -24,6 +24,7 @@ Agents get one generic tool (`call`) that reaches every API `gws` knows, a `sche
 | `schema <service.resource.method> [--resolve-refs]` | `schema` | Shows a method's parameters and request/response schema (`gws schema`). `--resolve-refs` fails on recursive types (e.g. Gmail messages). |
 | `gmail-message <id>` | `gmail_message` | One message: from/to/cc/date/subject, body as text (`text/plain`, else HTML converted), attachments (filename, mimeType, size, attachmentId), labels, threadId. |
 | `gmail-thread <id>` | `gmail_thread` | The same for every message in a thread. |
+| `drive-upload --file <path> [--folder-path 'A/B' \| --folder-id <id>] [--name] [--mime-type]` | `drive_upload` | Upload a local file to Drive; folder paths under My Drive are created when missing. |
 | `status` | `status` | App version and gws profile. |
 
 CLI examples:

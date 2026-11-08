@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- `drive-upload`: upload a local file to a Drive folder (by id or My Drive path, created when missing).
+
 ### Added
 
 - `call`: run any Google Workspace API method through `gws` (service, resource path, method, params, body, `fields`, `pageAll`/`pageLimit`); responses over 100 KB return a truncation notice with a hint. Annotated destructive/open-world.

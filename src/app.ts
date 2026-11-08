@@ -7,6 +7,7 @@ The version is read from `package.json` at runtime, so the same code runs from
 import { readFileSync } from "node:fs";
 import { argsbarg } from "argsbarg";
 import { callCommand } from "./commands/call/command.ts";
+import { driveUploadCommand } from "./commands/drive-upload/command.ts";
 import { gmailMessageCommand } from "./commands/gmail-message/command.ts";
 import { gmailThreadCommand } from "./commands/gmail-thread/command.ts";
 import { schemaCommand } from "./commands/schema/command.ts";
@@ -26,7 +27,7 @@ function packageFile(
 const version = (JSON.parse(packageFile("package.json")) as { version: string }).version;
 
 export const app = argsbarg({
-  commands: [callCommand, gmailMessageCommand, gmailThreadCommand, schemaCommand, statusCommand],
+  commands: [callCommand, driveUploadCommand, gmailMessageCommand, gmailThreadCommand, schemaCommand, statusCommand],
   description: createIdentity.desc,
   hooks: {
     beforeInvoke: attachGws,
@@ -36,7 +37,7 @@ export const app = argsbarg({
   mcpServer: {
     enabled: true,
     instructions:
-      "`call` reaches any Google Workspace API (Gmail, Calendar, Drive, Docs, Sheets, People/Contacts, Tasks…) via the gws CLI. Use `schema` (e.g. gmail.users.messages.list) to discover parameters before calling. Prefer `fields` masks and small page sizes to keep results small. Use `gmail-message` / `gmail-thread` to read email as text.",
+      "`call` reaches any Google Workspace API (Gmail, Calendar, Drive, Docs, Sheets, People/Contacts, Tasks…) via the gws CLI. Use `schema` (e.g. gmail.users.messages.list) to discover parameters before calling. Prefer `fields` masks and small page sizes to keep results small. Use `gmail-message` / `gmail-thread` to read email as text, and `drive-upload` to upload a local file.",
   },
   version,
 });
