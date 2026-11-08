@@ -7,7 +7,12 @@ Agents get one generic tool (`call`) that reaches every API `gws` knows, a `sche
 ## Requirements
 
 - Node ≥ 20 on PATH.
-- `gws` installed and authenticated (`gws auth login`). The server spawns it without a shell.
+- `gws` installed and authenticated with every scope the assistant uses (Tasks and Contacts aren't in the defaults). The server spawns it without a shell.
+
+```sh
+G=https://www.googleapis.com/auth
+gws --profile bdombro auth login --scopes "openid,email,profile,$G/calendar,$G/documents,$G/drive,$G/gmail.modify,$G/presentations,$G/spreadsheets,$G/tasks,$G/contacts"
+```
 
 ## Configuration (env)
 
