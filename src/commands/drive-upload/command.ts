@@ -6,7 +6,7 @@ file from this machine, but only from $HOME (no hidden paths, no ~/Library) or t
 
 import { realpathSync, statSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { basename, dirname, relative, sep } from "node:path";
+import { basename, dirname, relative, resolve, sep } from "node:path";
 import { command, OptionKind } from "argsbarg";
 import { z } from "zod";
 import { type GwsRunner, runGws } from "../../gws/client.ts";
@@ -89,17 +89,29 @@ export function resolveUploadPath(
     throw new Error(`File not found: ${file}`);
   }
   const roots = [
+    { root: home, isHome: true },
     { root: realpathSync(home), isHome: true },
-    ...realRoots(tempDirs).map((root) => ({ root, isHome: false })),
+    ...[...tempDirs, ...realRoots(tempDirs)].map((root) => ({ root, isHome: false })),
   ];
-  const hit = roots.find(({ root }) => real.startsWith(root + sep));
+  // Check both the path as given and its target, so a symlink can't hide a hidden or ~/Library path.
+  for (const path of [resolve(file), real]) uploadPathCheck(path, roots);
+  if (!statSync(real).isFile()) throw new Error("Refused: only regular files can be uploaded.");
+  return real;
+}
+
+/** Throws unless `path` sits under one of `roots` with no hidden component and (under home) not in Library. */
+function uploadPathCheck(
+  /** Absolute path to check. */
+  path: string,
+  /** Allowed roots; `isHome` marks the home directory. */
+  roots: { root: string; isHome: boolean }[],
+): void {
+  const hit = roots.find(({ root }) => path.startsWith(root + sep));
   if (!hit) throw new Error("Refused: drive-upload only reads files under $HOME or the OS temp dir.");
-  const parts = relative(hit.root, real).split(sep);
+  const parts = relative(hit.root, path).split(sep);
   if (parts.some((part) => part.startsWith(".")))
     throw new Error("Refused: hidden paths (like ~/.ssh) cannot be uploaded.");
   if (hit.isHome && parts[0] === "Library") throw new Error("Refused: ~/Library cannot be uploaded.");
-  if (!statSync(real).isFile()) throw new Error("Refused: only regular files can be uploaded.");
-  return real;
 }
 
 /** Real paths of the roots that exist. */

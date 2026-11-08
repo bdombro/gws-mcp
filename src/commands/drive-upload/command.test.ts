@@ -24,6 +24,7 @@ const files = {
 };
 for (const f of Object.values(files)) writeFileSync(f, "x");
 symlinkSync(files.key, join(home, "Documents/link"));
+symlinkSync(files.doc, join(home, ".dotfile-link"));
 after(() => rmSync(base, { force: true, recursive: true }));
 
 const resolveIn = (file: string) => resolveUploadPath(file, home, [temp]);
@@ -42,6 +43,8 @@ describe("resolveUploadPath", () => {
 
   test("resolves symlinks before checking", () => {
     assert.throws(() => resolveIn(join(home, "Documents/link")), /hidden/);
+    // A dotfile symlinked to a visible target (like ~/.zshrc -> dotfiles repo) is still refused.
+    assert.throws(() => resolveIn(join(home, ".dotfile-link")), /hidden/);
   });
 
   test("refuses directories and missing files", () => {
