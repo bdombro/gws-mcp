@@ -1,6 +1,6 @@
 {
   "name": "google-gws-mcp",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "private": true,
   "type": "module",
   "description": "Call any Google Workspace API (Gmail, Calendar, Drive, Docs, Sheets, People, Tasks…) through the gws CLI over MCP.",
