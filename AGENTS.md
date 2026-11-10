@@ -1,77 +1,30 @@
-# google-gws-mcp
+# AGENTS.md (`google-gws-mcp`)
 
-Argsbarg Claude Code / Cursor MCP plugin with a committed single-file Node bundle. Distributed as a plugin (`.claude-plugin/`, `.cursor-plugin/`); the manifests launch `node dist/google-gws-mcp.mjs mcp`.
+Written for: AI coding agents working in the `google-gws-mcp` C++26 plugin repository.
 
-## Argsbarg authoring
+`google-gws-mcp` is a C++26 MCP plugin and CLI built on `slimr-cpp` that wraps the `gws` Google Workspace CLI (`posix_spawnp`), decodes Gmail MIME trees and HTML bodies into readable text, downloads attachments safely, and uploads files to Google Drive.
 
-When adding or changing commands, schemas, or MCP exposure:
+## Commands
 
-1. **Read** `node_modules/argsbarg/docs/cli-program.md` first (authoritative).
-2. MCP tools, varargs, `inputSchema` → `node_modules/argsbarg/docs/mcp.md`.
-3. Zod schemas (`inputSchema`, `outputSchema`, JSON stdout) → `node_modules/argsbarg/docs/schemas.md`.
-4. Other templates for reference: `node_modules/argsbarg/examples/` (`cli`, `api`, `agent-plugin`, `homebrew`).
+| Task | Command |
+| --- | --- |
+| Run unit & mock-runner tests (ASan + UBSan, no network) | `just test` |
+| Build release binary (`dist/google-gws-mcp`) | `just build` |
+| Clean build artifacts | `just clean` |
 
-**Rules** (details are in the docs above; don't contradict them):
+## Module Boundaries
 
-- Reserved root commands: `completion`, `mcp`, `http`, `version`.
-- `argsbarg({ … })` builds the app in `src/app.ts`; `command({ … })` declares every command (typed `ctx.inputs` / `ctx.pathParams`). Give the root, commands, options, and positionals action-oriented `description`s.
-- Omit `mcpTool` unless a command is genuinely CLI-only (`enabled: false`) or hits an irreducible wire limit; fix the schema and headless path first.
-- String options: `format` / `default` / `pattern` per `cli-program.md`; use `ctx.inputs` for multi-flag commands.
-- Varargs (`argMax: 0`): space-separated on the CLI, a JSON array over MCP; never comma-split positionals.
-- App settings are app code (env vars or your own file); argsbarg doesn't manage them.
-- Multi-surface commands (Ink + headless + MCP): one `read*Flags(ctx)` per command and one `resolve*Input(flags)` for cross-field rules, so every path shares one struct.
-- Schemas live at the top of the command's `command.ts` (a sibling `schemas.ts` only when shared or large): export the Zod schema and a same-named `z.infer` type. Prefer `z.strictObject`; document every field with `.describe("…")` (agents read it; JSDoc isn't emitted).
-
-## Code conventions
-
-- **JSDoc:** document exported surfaces that aren't obvious from the name (output schemas, public types, non-trivial algorithms). Skip short test callbacks and pure re-export files.
-- **Names:** describe the domain role; avoid `data` / `handler`-style placeholders outside tiny scopes.
-- **Structure:** after imports, exported symbols first (alphabetical within each kind), then module-private helpers. Relative imports with explicit `.ts` extensions.
-- **Abstractions:** keep single-use helpers in the calling file. Split only when reused, when the caller is hard to follow, or when the extraction is a substantial unit.
-- **Skill:** when commands are added, renamed, or removed, update `skills/google-gws-mcp/SKILL.md`.
-- **Changelog:** add a concise `[Unreleased]` CHANGELOG entry for behavior changes.
-
-### Module boundaries
-
-| Path | Owns | Must not |
+| Path | Owns | Must Not |
 | --- | --- | --- |
-| `src/index.ts` | Entry: `await app.run()` | Command handlers, business logic |
-| `src/app.ts` | App spec: `commands: […]` (alphabetical by key) | Command handlers, business logic |
-| `src/create-identity.ts` | Key, release repo, description (rewritten by `argsbarg create`) | Anything else |
-| `src/types/` | Module augmentations (`argsbarg.d.ts`: `Locals.gws`) | Runtime logic |
-| `src/gws/` | gws runner (`client.ts`: argv, profile, spawn, JSON/NDJSON parse, errors) and result size cap (`cap.ts`) | Command handlers |
-| `src/gmail/` | Gmail MIME walking and message summaries (`mime.ts`) | Spawning gws |
-| `src/html-to-text.ts` | Zero-dependency email HTML-to-text | Gmail or gws specifics |
-| `src/test-helpers.ts` | Mock gws runner and app wiring for tests | Production paths |
-| `src/commands/<name>/` | One command: `command.ts` (with its Zod schemas), colocated `*.test.ts` | Shared helpers (lift them out) |
-| `scripts/` | Dev tooling (release) | Production command paths |
+| `src/main.cpp` | Entrypoint calling `gws::make_google_gws_app().run(argc, argv)` | Business logic |
+| `src/app.hpp` | `make_google_gws_app()`, API method blocklist (`is_blocked_method`), path containment (`validate_upload_path`, `resolve_attachment_dest`), and typed C++ entrypoints (`gws::call`, `gws::gmail_message`, `gws::gmail_thread`, `gws::gmail_attachment`, `gws::drive_upload`, `gws::schema`, `gws::status`) | Bypass blocklists or path guards |
+| `src/client.hpp` | `GwsRunner`, `exec_gws` (`posix_spawnp` + `poll()`), `GWS_PROFILE` handling, keyring noise filtering, `cap_json` (100 KB limit) | Use `/bin/sh` or `popen` |
+| `src/mime.hpp` | Base64url decoding, recursive MIME part walking, charset decoding (UTF-8, ISO-8859-1), attachment listing | — |
+| `src/html_to_text.hpp` | HTML-to-readable-text conversion, hidden-element pruning (`display:none`, `visibility:hidden`, `opacity:0`, `font-size:0`, `hidden`), UTM query stripping, invisible Unicode removal | Retain hidden prompt-injection spans |
+| `tests/test_main.cpp` | 52 test cases using injected `GwsRunner` mocks | Spawn live `gws` calls in unit tests |
 
-## Tooling
+## Safety & App Conventions
 
-- Node ≥ 22.18 and npm; no Bun required. [just](https://just.systems) runs the tasks.
-- `just setup`, `just check` (Biome + `tsc --noEmit`), `just test` (check + `node --test`), `just run …` (from source, type-stripped).
-- `just build` rebuilds the committed bundle `dist/google-gws-mcp.mjs` (esbuild). Plugins run it with `node` via inline manifest MCP configs; commit it with its source and never hand-edit it. stdout is the MCP protocol.
-- `just plugin-claude-install`, `just plugin-cursor-upsert` install this checkout locally.
-- Release: `just release <major|minor|patch>` (no prompt: tests, bumps, builds, commits all changes, tags, pushes, GitHub release).
-
-## Testing boundaries
-
-- Use the cheapest test level that establishes the behavior. Reuse existing tests and helpers.
-- Unit/offline: deterministic parsing, validation, state changes, and request planning, independent of live services and paid agents.
-- Integration: contracts unit tests cannot establish (clean plugin installation, MCP startup/transport, external persistence). Don't duplicate unit coverage with live calls.
-- Agent E2E: safe user-task completion and agent efficiency. Check outcomes and protected content, not exact tool-call sequences. Run explicitly, never in the default test command.
-- When E2E exposes a tool bug, reproduce and fix it in unit tests first. Check verifier changes offline before another paid run.
-- Attribute agent failures from observable evidence; a failed call alone doesn't establish task failure or a tool defect.
-
-## Documentation
-
-- `README.md` — install and commands for users
-- `docs/architecture.md` — maintainer notes (create when needed)
-- `skills/google-gws-mcp/SKILL.md` — agent skill (customize as needed)
-
-## App conventions
-
-- Every gws call goes through `runGws(ctx.locals.gws, args)`; `attachGws` (app `beforeInvoke`) sets the real runner and tests swap in `mockGws` via `appWithGws`. Never spawn gws elsewhere, never use a shell.
-- `--profile $GWS_PROFILE` (default `bdombro`) is prepended by `runGws`; it must be gws's first argument (the profile shim only reads it there).
-- Tests never hit the network. Manual smoke tests against real gws must be read-only.
-- Generic results go through `capJson` so agents get a hint instead of a huge payload.
+1. **Never weaken the `call` blocklist:** `call` must always refuse sending mail/drafts (`users.messages.send`, `users.drafts.send`), modifying Gmail filters/forwarding/delegates, modifying Drive permissions or permanently deleting files (`permissions.*`, `files.delete`), modifying Calendar ACLs (`acl.*`), and running Apps Script (`script.scripts.run`).
+2. **Never use a shell:** `exec_gws` spawns `gws` directly via `posix_spawnp` and validates all service/resource/method tokens so flags cannot be injected.
+3. **Path containment:** `drive_upload` must refuse symlinks, non-regular files, files outside `$HOME` / temp dirs, hidden paths (`~/.ssh`, `~/.config`), and `~/Library`. `gmail_attachment` must always write inside `~/Downloads/gws/<messageId>/` and never overwrite an existing file (append `-1`, `-2`, …).

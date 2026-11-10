@@ -1,2 +1,6 @@
-node_modules/
+bin/
+dist/
+*.o
+*.gch
+*.dSYM
 .DS_Store

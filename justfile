@@ -1,47 +1,26 @@
-# bash (not sh); -e bail on errors, -u error on unset vars, pipefail fails pipelines when any stage fails
+# google-gws-mcp tasks
 set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 
-export PATH := justfile_directory() + "/node_modules/.bin:" + env("PATH")
+CXX := "clang++"
+CXXFLAGS := "-std=c++26 -Wall -Wextra -Wno-unused-parameter -Isrc -I../../slimr-cpp/include -I../../vendor/glaze/include -I../../vendor"
+LDFLAGS := "-lcurl"
 
-# List available recipes (default)
+# List recipes
 _:
     @just --list
 
-# Rebuild the committed Node bundle that plugins run (commit dist/google-gws-mcp.mjs)
+# Run comprehensive test suite with AddressSanitizer and UndefinedBehaviorSanitizer
+test:
+    mkdir -p bin
+    {{CXX}} {{CXXFLAGS}} -fsanitize=address,undefined -g tests/test_main.cpp {{LDFLAGS}} -o bin/test_runner
+    ./bin/test_runner
+
+# Build optimized release binary
 build:
-    esbuild src/index.ts --bundle --platform=node --target=node20 --format=esm --minify-whitespace --minify-syntax --outfile=dist/google-gws-mcp.mjs
+    mkdir -p dist ../../dist
+    {{CXX}} {{CXXFLAGS}} -O3 -flto src/main.cpp {{LDFLAGS}} -o dist/google-gws-mcp
+    cp dist/google-gws-mcp ../../dist/google-gws-mcp
 
-# Install the Claude Code plugin from this checkout (restart Claude Code afterwards)
-plugin-claude-install: build
-    claude plugin marketplace add "$(pwd)"
-    claude plugin install google-gws-mcp@google-gws-mcp
-
-# Link the plugin into ~/.cursor/plugins/local for local testing
-plugin-cursor-upsert: build
-    mkdir -p ~/.cursor/plugins/local
-    ln -sfn '{{justfile_directory()}}' ~/.cursor/plugins/local/google-gws-mcp
-
-# Format, lint, and typecheck
-check:
-    biome check --write ./src ./scripts
-    tsc --noEmit
-
-# Run the CLI from source (type-stripped) with optional args
-run *ARGS:
-    node src/index.ts {{ARGS}}
-
-# Run the CLI from source and restart on file changes
-dev *ARGS:
-    node --watch src/index.ts {{ARGS}}
-
-# Install dependencies
-setup:
-    npm install
-
-# Check, then run the tests
-test: check
-    node --test "src/**/*.test.ts"
-
-# Bump version, test, build, commit, tag, push, publish
-release *ARGS:
-    node scripts/release.ts {{ARGS}}
+# Clean build artifacts
+clean:
+    rm -rf bin dist *.o *.gch
