@@ -1,5 +1,5 @@
 #define SLIMR_TEST_MAIN
-#include "slimr/test.hpp"
+#include "test.hpp"
 
 #include "app.hpp"
 #include "client.hpp"
@@ -13,6 +13,28 @@
 
 namespace fs = std::filesystem;
 using namespace gws;
+
+TEST_CASE("subprocess working directory is applied without invoking gws") {
+    slimr::testing::TempDirGuard temp;
+    struct RestoreBinary {
+        std::optional<std::string> previous;
+        RestoreBinary() {
+            if (const char* value = getenv("GWS_BIN")) previous = value;
+            setenv("GWS_BIN", "/bin/pwd", 1);
+        }
+        RestoreBinary(const RestoreBinary&) = delete;
+        RestoreBinary& operator=(const RestoreBinary&) = delete;
+        ~RestoreBinary() {
+            if (previous) setenv("GWS_BIN", previous->c_str(), 1);
+            else unsetenv("GWS_BIN");
+        }
+    } restore;
+    const auto run = exec_gws({}, temp.path.string());
+    CHECK(run.exitCode == 0);
+    CHECK(fs::weakly_canonical(run.stdoutStr.substr(0, run.stdoutStr.find('\n'))) ==
+          fs::weakly_canonical(temp.path));
+    CHECK_THROWS_AS(exec_gws({}, (temp.path / "missing").string()), GwsError);
+}
 
 // Mock runner helper
 struct MockGws {
@@ -293,8 +315,8 @@ TEST_SUITE("gmail MIME walking") {
 }
 
 TEST_SUITE("gws/client") {
-    TEST_CASE("profile_args defaults to bdombro, honors override, omits when empty") {
-        CHECK(profile_args("bdombro") == std::vector<std::string>{"--profile", "bdombro"});
+    TEST_CASE("profile_args honors override and omits when empty") {
+        CHECK(profile_args("example") == std::vector<std::string>{"--profile", "example"});
         CHECK(profile_args("ss") == std::vector<std::string>{"--profile", "ss"});
         CHECK(profile_args("").empty());
     }
@@ -591,7 +613,7 @@ TEST_SUITE("call command") {
             std::string msg = e.what();
             CHECK(msg.find("Blocked: gmail.users.messages.send") != std::string::npos);
             CHECK(msg.find("gdocsmith") != std::string::npos);
-            CHECK(msg.find("Brian") != std::string::npos);
+            CHECK(msg.find("ask the user") != std::string::npos);
         }
         CHECK(gws.calls.empty());
     }
@@ -669,7 +691,8 @@ TEST_SUITE("drive-upload command") {
     TEST_CASE("ensure_folder_path reuses existing folders and creates missing ones") {
         MockGws gws;
         gws.reply = [](const auto& args, const auto&) {
-            std::string op = (args.size() > 4) ? args[4] : "";
+            const auto offset = !args.empty() && args.front() == "--profile" ? 4u : 2u;
+            std::string op = args.size() > offset ? args[offset] : "";
             if (op == "list") {
                 std::string full;
                 for (const auto& a : args) full += a + " ";
@@ -887,7 +910,8 @@ TEST_SUITE("status command") {
     TEST_CASE("returns version and profile") {
         auto res = status({});
         CHECK(res.version.get() == "2.0.0");
-        CHECK(!res.profile.get().empty());
+        const auto expected = profile_args();
+        CHECK(res.profile.get() == (expected.empty() ? "" : expected.back()));
     }
 }
 
@@ -895,10 +919,10 @@ TEST_SUITE("PluginApp integration & MCP dispatch") {
     TEST_CASE("make_google_gws_app registers all 7 tools") {
         MockGws gws;
         auto app = make_google_gws_app(gws.runner());
-        CHECK(app.key == "google-gws-mcp");
+        CHECK(app.key == "gws-mcp");
         CHECK(app.version == "2.0.0");
         CHECK(!app.instructions.empty());
-        CHECK(!app.bugsinkDsn.empty());
+        CHECK(app.bugsink() != nullptr);
 
         const auto& tools = app.tools();
         CHECK(tools.contains("call"));
@@ -925,7 +949,7 @@ TEST_SUITE("PluginApp integration & MCP dispatch") {
         initReq["params"]["protocolVersion"] = "2025-11-25";
         auto initResp = app.dispatchMcpJson(initReq);
         CHECK(initResp["result"]["protocolVersion"].get<std::string>() == "2025-11-25");
-        CHECK(initResp["result"]["serverInfo"]["name"].get<std::string>() == "google-gws-mcp");
+        CHECK(initResp["result"]["serverInfo"]["name"].get<std::string>() == "gws-mcp");
 
         // tools/list
         slimr::Json listReq = slimr::Json::object_t{};

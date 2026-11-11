@@ -1,6 +1,6 @@
 #pragma once
 
-#include "slimr/json.hpp"
+#include "json.hpp"
 
 #include <cstdlib>
 #include <cstring>
@@ -57,7 +57,7 @@ inline std::vector<std::string> profile_args(std::optional<std::string> profile 
         resolved = *profile;
     } else {
         const char* env_p = getenv("GWS_PROFILE");
-        resolved = env_p ? std::string(env_p) : "bdombro";
+        resolved = env_p ? std::string(env_p) : "";
     }
     if (resolved.empty()) {
         return {};
@@ -138,7 +138,11 @@ inline GwsRun exec_gws(const std::vector<std::string>& args, const std::string& 
     posix_spawn_file_actions_addclose(&actions, stderr_pipe[1]);
 
     if (!cwd.empty()) {
+#if defined(__linux__)
+        posix_spawn_file_actions_addchdir_np(&actions, cwd.c_str());
+#else
         posix_spawn_file_actions_addchdir(&actions, cwd.c_str());
+#endif
     }
 
     std::vector<char*> argv_ptrs;

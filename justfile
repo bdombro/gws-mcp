@@ -1,26 +1,45 @@
-# google-gws-mcp tasks
-set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
+set shell := ["zsh", "-f", "-eu", "-o", "pipefail", "-c"]
+set positional-arguments
 
-CXX := "clang++"
-CXXFLAGS := "-std=c++26 -Wall -Wextra -Wno-unused-parameter -Isrc -I../../slimr-cpp/include -I../../vendor/glaze/include -I../../vendor"
-LDFLAGS := "-lcurl"
+architecture := replace(replace(arch(), "aarch64", "arm64"), "x86_64", "x64")
+system := if os() == "macos" { "osx" } else { os() }
+triplet := f'{{architecture}}-{{system}}'
+compiler := if os() == "macos" { "/usr/bin/clang++" } else { "clang++" }
 
-# List recipes
 _:
     @just --list
 
-# Run comprehensive test suite with AddressSanitizer and UndefinedBehaviorSanitizer
-test:
-    mkdir -p bin
-    {{CXX}} {{CXXFLAGS}} -fsanitize=address,undefined -g tests/test_main.cpp {{LDFLAGS}} -o bin/test_runner
-    ./bin/test_runner
+deps:
+    vcpkg install --x-wait-for-lock --triplet={{triplet}} --x-install-root=build/deps
 
-# Build optimized release binary
-build:
-    mkdir -p dist ../../dist
-    {{CXX}} {{CXXFLAGS}} -O3 -flto src/main.cpp {{LDFLAGS}} -o dist/google-gws-mcp
-    cp dist/google-gws-mcp ../../dist/google-gws-mcp
+configure configuration="Debug": deps
+    CXX="${CXX:-{{compiler}}}" cmake -S . -B build/cmake/{{configuration}} -G Ninja \
+        -DCMAKE_BUILD_TYPE={{configuration}} \
+        -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+        -DVCPKG_MANIFEST_MODE=OFF \
+        -DVCPKG_INSTALLED_DIR="{{justfile_directory()}}/build/deps" \
+        -DVCPKG_TARGET_TRIPLET={{triplet}} \
+        -DENABLE_SANITIZERS={{if configuration == "Debug" { "ON" } else { "OFF" }}}
 
-# Clean build artifacts
+test: (configure "Debug")
+    cmake --build build/cmake/Debug --parallel 2
+    ctest --test-dir build/cmake/Debug --output-on-failure --no-tests=error
+
+build: (configure "Release")
+    cmake --build build/cmake/Release --parallel 2
+    ctest --test-dir build/cmake/Release --output-on-failure --no-tests=error
+
+lint: (configure "Debug")
+    clang-tidy -p build/cmake/Debug src/main.cpp tests/test_main.cpp
+
+test-mcp: build
+    node scripts/test-mcp.mjs build/bin/gws-mcp call,schema,gmail-message,gmail-thread,gmail-attachment,drive-upload,status
+
+inspect:
+    npx --yes @modelcontextprotocol/inspector@2.14.0 ./build/bin/gws-mcp mcp
+
+run *args:
+    ./build/bin/gws-mcp "$@"
+
 clean:
-    rm -rf bin dist *.o *.gch
+    rm -rf build

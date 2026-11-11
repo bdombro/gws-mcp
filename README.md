@@ -1,4 +1,4 @@
-# google-gws-mcp
+# gws-mcp
 
 ```
     .----.      .---.
@@ -20,18 +20,18 @@ Read Gmail as clean, readable text and upload files to Drive without hand-buildi
 
 ## `.mcp.json` Configuration
 
-In the `assistant2` workspace, `google-gws-mcp` is mounted into the unified `dist/assistant-mcp` gateway under the `gws_` prefix (`gws_call`, `gws_schema`, `gws_gmail_message`, `gws_gmail_thread`, `gws_gmail_attachment`, `gws_drive_upload`, `gws_status`).
+In the `assistant2` workspace, `gws-mcp` is mounted into the unified `build/bin/assistant-mcp` gateway under the `gws_` prefix (`gws_call`, `gws_schema`, `gws_gmail_message`, `gws_gmail_thread`, `gws_gmail_attachment`, `gws_drive_upload`, `gws_status`).
 
-To run `google-gws-mcp` as a standalone MCP server in `.mcp.json`:
+To run `gws-mcp` as a standalone MCP server in `.mcp.json`:
 
 ```json
 {
   "mcpServers": {
-    "google-gws-mcp": {
-      "command": "/Users/briandombrowski/dev/bdombro/assistant/assistant2/plugins/google-gws-mcp/dist/google-gws-mcp",
+    "gws-mcp": {
+      "command": "/absolute/path/to/build/bin/gws-mcp",
       "args": ["mcp"],
       "env": {
-        "GWS_PROFILE": "bdombro",
+        "GWS_PROFILE": "work",
         "GWS_BIN": "gws"
       }
     }
@@ -44,8 +44,10 @@ To run `google-gws-mcp` as a standalone MCP server in `.mcp.json`:
 The standalone MCP and JSON CLI are implemented in C++26 on `slimr-cpp`; API calls are delegated to the official [`gws` CLI](https://github.com/googleworkspace/cli).
 
 ```text
-plugins/google-gws-mcp/
-├── justfile                  # `just test` (ASan + UBSan) and `just build` (-O3 -flto)
+plugins/gws-mcp/
+├── vcpkg.json                # Independently resolved dependencies
+├── CMakeLists.txt            # App/test targets and transitive dependency linking
+├── justfile                  # Thin CMake/Ninja orchestration
 ├── README.md                 # User & operator documentation
 ├── AGENTS.md                 # Maintainer & AI agent conventions
 ├── src/
@@ -55,22 +57,22 @@ plugins/google-gws-mcp/
 │   ├── app.hpp               # `gws::make_google_gws_app()`, API method blocklist, path containment, and in-process C++ API
 │   └── main.cpp              # Standalone CLI & stdio MCP entrypoint
 ├── tests/
-│   └── test_main.cpp         # 52 unit & mock-runner test cases with ASan + UBSan
-└── dist/
-    └── google-gws-mcp        # Standalone ARM64 release binary (~773 KB)
+│   └── test_main.cpp         # 53 unit, mock-runner and isolated process test cases with ASan + UBSan
+└── build/bin/
+    └── gws-mcp               # Standalone release binary
 ```
 
 ### Libraries Used
 
-- **`<slimr/mcp.hpp>` & `<slimr/reflect.hpp>`:** Typed MCP tool definitions, compile-time JSON Schema generation, and narrow JSON CLI.
-- **`<slimr/json.hpp>` (`glaze`):** Fast JSON parsing and 100 KB response capping (`cap_json`).
-- **`<slimr/bugsink.hpp>` (`-lcurl`):** Automatic error reporting to `bugsink.btek.cc`.
-- **`<slimr/test.hpp>` (`doctest`):** Mock `GwsRunner` test suite compiled with `-fsanitize=address,undefined`.
+- **`<mcp.hpp>` & `<reflect.hpp>`:** Typed MCP tool definitions, compile-time JSON Schema generation, and narrow JSON CLI.
+- **`<json.hpp>` (`glaze`):** Fast JSON parsing and 100 KB response capping (`cap_json`).
+- **`<bugsink.hpp>` (`-lcurl`):** opt-in error reporting through `BUGSINK_DSN`.
+- **`<test.hpp>` (`doctest`):** Mock `GwsRunner` test suite compiled with `-fsanitize=address,undefined`.
 - **POSIX & C++26 Standard Library:** `<spawn.h>` (`posix_spawnp`), `<poll.h>`, `<filesystem>`, `<regex>`.
 
 ## Tools & CLI Commands
 
-Every tool is available over MCP (`google-gws-mcp mcp` or via `assistant-mcp` under the `gws_` prefix) and on the CLI (`google-gws-mcp <tool> ['{"arg":"val"}']`).
+Every tool is available over MCP (`gws-mcp mcp` or via `assistant-mcp` under the `gws_` prefix) and on the CLI (`gws-mcp <tool> ['{"arg":"val"}']`).
 
 | Tool | Gateway Name | Mutating | Description |
 | --- | --- | --- | --- |
@@ -86,19 +88,19 @@ Every tool is available over MCP (`google-gws-mcp mcp` or via `assistant-mcp` un
 
 ```bash
 # List 5 unread Gmail messages with partial response mask
-./dist/google-gws-mcp call '{"service":"gmail","resource":["users","messages"],"method":"list","params":{"userId":"me","q":"is:unread","maxResults":5},"fields":"messages(id,threadId)"}'
+./build/bin/gws-mcp call '{"service":"gmail","resource":["users","messages"],"method":"list","params":{"userId":"me","q":"is:unread","maxResults":5},"fields":"messages(id,threadId)"}'
 
 # Read a Gmail message as clean plain text
-./dist/google-gws-mcp gmail_message '{"id":"1a1b6731c6fdd2af"}'
+./build/bin/gws-mcp gmail-message '{"id":"1a1b6731c6fdd2af"}'
 
 # Read an entire Gmail thread
-./dist/google-gws-mcp gmail_thread '{"id":"1a1b6731c6fdd2af"}'
+./build/bin/gws-mcp gmail-thread '{"id":"1a1b6731c6fdd2af"}'
 
 # Inspect Google Tasks insert schema
-./dist/google-gws-mcp schema '{"method":"tasks.tasks.insert"}'
+./build/bin/gws-mcp schema '{"method":"tasks.tasks.insert"}'
 
 # Upload a file to a Drive folder path
-./dist/google-gws-mcp drive_upload '{"file":"/Users/briandombrowski/Downloads/invoice.pdf","folderPath":"Receipts/2026"}'
+./build/bin/gws-mcp drive-upload '{"file":"/absolute/path/to/invoice.pdf","folderPath":"Receipts/2026"}'
 ```
 
 ## Safety Rules Enforced in C++ (`src/app.hpp` & `src/html_to_text.hpp`)
@@ -117,18 +119,30 @@ Ensure `gws` is authenticated with all required scopes:
 
 ```bash
 G=https://www.googleapis.com/auth
-gws --profile bdombro auth login --scopes "openid,email,profile,$G/calendar,$G/documents,$G/drive,$G/gmail.modify,$G/presentations,$G/spreadsheets,$G/tasks,$G/contacts"
+gws --profile work auth login --scopes "openid,email,profile,$G/calendar,$G/documents,$G/drive,$G/gmail.modify,$G/presentations,$G/spreadsheets,$G/tasks,$G/contacts"
 ```
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `GWS_PROFILE` | `bdombro` | Passed as `gws --profile <name>` (set to `""` to omit `--profile`) |
+| `GWS_PROFILE` | unset (gws default) | Passed as `gws --profile <name>` (set to `""` to omit `--profile`) |
 | `GWS_BIN` | `gws` | Path or binary name of the `gws` CLI executable |
-| `BUGSINK_DSN` | Project DSN on `bugsink.btek.cc` | Error reporting DSN (`""` disables) |
+| `BUGSINK_DSN` | unset (disabled) | Error reporting DSN (`""` disables) |
 
 ## Building & Testing
 
+Use Clang with C++26 and libc++ FAST hardening, CMake 3.31+, Ninja, [just](https://just.systems), a bootstrapped [vcpkg](https://vcpkg.io), Node for Inspector, and a compatible clang-tidy (LLVM 23 locally). Set `VCPKG_ROOT` and put vcpkg and the tools on `PATH`. Linux additionally needs libc++ and libc++abi; select libc++ with `CXXFLAGS=-stdlib=libc++`.
+
+Dependencies are declared in `vcpkg.json`. During local development, `(cd /absolute/path/to/slimr-cpp && just publish --local --all)` publishes ports into vcpkg's local overlay; export `VCPKG_OVERLAY_PORTS="$VCPKG_ROOT/local-ports"` in your shell. `just deps` installs into `build/deps/` for the detected native triplet. `configure` always runs it, with CMake manifest installation disabled. CMake links installed `slimr::mcp` and `slimr::test` targets, never source-header overrides.
+
 ```bash
-just test     # Run 52 unit & mock-subprocess test cases with ASan + UBSan
-just build    # Build optimized ARM64 release binary (-O3 -flto) at dist/google-gws-mcp
+just test      # Debug ASan/UBSan tests, with fatal undefined behavior reports
+just build     # Optimized IPO Release app and tests; build/bin/gws-mcp
+just lint      # App and test translation units using the Debug compilation database
+just test-mcp  # Pinned Inspector 2.14.0: initialize and tools/list only
+just run status
+just clean     # Remove build/ only; leaves legacy dist/ and user data untouched
 ```
+
+Debug and Release graphs live in `build/cmake/Debug/` and `build/cmake/Release/`; only Release apps are emitted to `build/bin/`. Set `CXX` before the first configure to choose a compiler; CMake retains its absolute path even when lint uses a different `PATH`. Both configurations enable libc++ hardening and zero automatic-variable initialization. Inspector isolates HOME/XDG directories under `build/`, clears credentials, disables error reporting and external CLI access, and cleans up afterward; it never invokes a tool.
+
+CI runs the same commands on native Linux/macOS. Configure `VCPKG_REF` to the tested full vcpkg commit SHA; slimr packages resolve from the public registry pinned in `vcpkg-configuration.json`, without a dependency token. Local macOS validation is not Linux execution evidence.

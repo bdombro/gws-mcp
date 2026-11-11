@@ -1,8 +1,8 @@
 #pragma once
 
 #include "html_to_text.hpp"
-#include "slimr/json.hpp"
-#include "slimr/reflect.hpp"
+#include "json.hpp"
+#include "reflect.hpp"
 
 #include <algorithm>
 #include <cstdint>
