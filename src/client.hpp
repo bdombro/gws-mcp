@@ -138,10 +138,10 @@ inline GwsRun exec_gws(const std::vector<std::string>& args, const std::string& 
     posix_spawn_file_actions_addclose(&actions, stderr_pipe[1]);
 
     if (!cwd.empty()) {
-#if defined(__linux__)
-        posix_spawn_file_actions_addchdir_np(&actions, cwd.c_str());
-#else
+#if defined(__APPLE__) && __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ >= 260000
         posix_spawn_file_actions_addchdir(&actions, cwd.c_str());
+#else
+        posix_spawn_file_actions_addchdir_np(&actions, cwd.c_str());
 #endif
     }
 
