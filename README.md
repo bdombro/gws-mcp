@@ -11,6 +11,18 @@ Give your agent a consistent MCP interface to Gmail, Calendar, Drive, Docs, Shee
 
 Read Gmail as clean, readable text and upload files to Drive without hand-building multipart requests. The server invokes the official `gws` CLI directly, blocks selected high-risk API operations, and constrains local upload paths.
 
+> **Client compatibility:** MCP **2026-07-28 only**; legacy clients cannot connect.
+> The workspace has been exercised with OpenCode v2.2.6 using explicit July
+> configuration. Cursor's July support is deferred; Claude Code July runtime
+> acceptance is not yet verified. Shipping a plugin manifest is not proof of
+> client compatibility.
+
+## Try It
+
+After setup, ask your agent:
+
+> Show me five unread emails as readable summaries.
+
 ## Features
 
 - Call Workspace APIs, inspect their schemas, read Gmail messages and threads, and download attachments.
@@ -18,78 +30,76 @@ Read Gmail as clean, readable text and upload files to Drive without hand-buildi
 - Blocks selected sending, sharing, deletion, and script-execution operations.
 - Small footprint: a standalone C++26 binary exposing CLI, stdio MCP, and Streamable HTTP (`127.0.0.1:8086`); the `gws` CLI is the only runtime service dependency.
 
-## Transports & MCP `2026-07-28`
+## Installation
 
-`gws-mcp` implements the MCP **`2026-07-28`** specification over both stdio and Streamable HTTP:
+- **Prebuilt release:** the checked-in [Homebrew formula](Formula/gws-mcp.rb)
+  currently has a placeholder checksum. It is not a ready-to-install release.
+  Check [releases](https://github.com/bdombro/gws-mcp/releases) for published
+  binaries and a finalized formula before using a release installation command.
+- **Build from source:** the current path is [Development](#development).
+  Local slimr overlays are for development, not a runtime requirement.
+- **Already installed:** follow the setup and service steps below. Installing a
+  Cursor/Claude manifest only configures an endpoint; it does not install or
+  start the native service.
 
-- **Breaking change (`2026-07-28`):** Session initialization (`initialize`), `notifications/initialized`, `MCP-Session-Id` headers, and SSE `GET`/`DELETE` streams are removed. Clients discover capabilities via `server/discover`, list tools via `tools/list`, and call tools via `tools/call`. On HTTP `POST /mcp`, callers must send `MCP-Protocol-Version: 2026-07-28` (and `Accept: application/json`), plus `Mcp-Method` (and `Mcp-Name` on `tools/call`). Calling `initialize` returns `-32601 Method not found`.
-- **Streamable HTTP (default port `8086`):**
-  ```bash
-  ./build/bin/gws-mcp http --host 127.0.0.1 --port 8086
-  # Endpoint: http://127.0.0.1:8086/mcp
-  ```
-- **Stdio MCP (`mcp`):**
-  ```json
-  {
-    "mcpServers": {
-      "gws-mcp": {
-        "command": "/absolute/path/to/gws-mcp",
-        "args": ["mcp"],
-        "env": {
-          "GWS_PROFILE": "work",
-          "GWS_BIN": "gws"
-        }
-      }
-    }
-  }
-  ```
-- **HTTP client configuration:**
-  ```json
-  {
-    "mcpServers": {
-      "gws-mcp": {
-        "type": "http",
-        "url": "http://127.0.0.1:8086/mcp"
-      }
-    }
-  }
-  ```
-- **Cursor / Claude plugins:** `.cursor-plugin/plugin.json`, `.claude-plugin/plugin.json`, and `.claude-plugin/marketplace.json` configure the HTTP server at `http://127.0.0.1:8086/mcp`. Note that host clients using these manifests must support MCP `2026-07-28` Streamable HTTP.
 
-## App Architecture
+## Configure Google Access
 
-The standalone MCP server (stdio + Streamable HTTP) and JSON CLI are implemented in C++26 on `slimr-cpp`; API calls are delegated to the official [`gws` CLI](https://github.com/googleworkspace/cli).
+Install the official [Google Workspace CLI](https://github.com/googleworkspace/cli):
 
-```text
-plugins/gws-mcp/
-├── vcpkg.json                      # Independently resolved dependencies (slimr-mcp[http])
-├── CMakeLists.txt                  # App/test targets and transitive dependency linking (slimr::mcp_http)
-├── justfile                        # CMake/Ninja, lint, test-mcp, and Homebrew service lifecycle
-├── Formula/gws-mcp.rb              # Homebrew formula + launchd service definition (127.0.0.1:8086)
-├── scripts/
-│   ├── dev-formula.mjs             # Local tarball formula staging helper
-│   └── test-mcp.mjs                # Stdio + ephemeral HTTP MCP 2026-07-28 conformance check
-├── .cursor-plugin/plugin.json      # Cursor plugin manifest (HTTP 127.0.0.1:8086/mcp)
-├── .claude-plugin/                 # Claude plugin & marketplace manifests (HTTP 127.0.0.1:8086/mcp)
-├── src/
-│   ├── client.hpp                  # `posix_spawnp` + `poll()` subprocess runner for `gws`, stderr noise filter, 100 KB cap
-│   ├── html_to_text.hpp            # Prompt-injection-hardened HTML-to-readable-text converter (strips hidden elements & UTM params)
-│   ├── mime.hpp                    # Base64url decoder, Gmail MIME tree walker, charset converter (UTF-8 / Latin-1), attachment extractor
-│   ├── app.hpp                     # `gws::make_google_gws_app()`, API method blocklist, path containment, and in-process C++ API
-│   └── main.cpp                    # Standalone CLI, stdio (`mcp`), and Streamable HTTP (`http`) entrypoint
-├── tests/
-│   └── test_main.cpp               # Unit, mock-runner, CLI, MCP 2026-07-28, and HTTP concurrency tests (ASan + UBSan)
-└── build/bin/
-    └── gws-mcp                     # Standalone release binary
+```bash
+npm install -g @googleworkspace/cli
 ```
 
-### Libraries Used
+Follow its OAuth setup/login instructions and authorize the services you
+intend to use, including Tasks when needed. Select a profile with
+`GWS_PROFILE` and a custom executable with `GWS_BIN` in the server's
+environment. Authentication belongs to the local CLI, not the MCP client's
+HTTP Connect flow. See [Authentication & Security Boundary](#authentication--security-boundary).
 
-- **`<mcp.hpp>`, `<mcp_http.hpp>` & `<reflect.hpp>`:** Typed MCP `2026-07-28` tool definitions, compile-time JSON Schema generation, Streamable HTTP transport (`127.0.0.1:8086`), and narrow JSON CLI.
-- **`<json.hpp>` (`glaze`):** Fast JSON parsing and 100 KB response capping (`cap_json`).
-- **`<bugsink.hpp>` (`-lcurl`):** Opt-in error reporting through `BUGSINK_DSN`.
-- **`<test.hpp>` (`doctest`):** Mock `GwsRunner`, CLI, and `McpHttpServer` test suite compiled with `-fsanitize=address,undefined`.
-- **POSIX & C++26 Standard Library:** `<spawn.h>` (`posix_spawnp`), `<poll.h>`, `<filesystem>`, `<regex>`.
+
+## Start and Manage the Service
+
+For an already-installed Homebrew formula:
+
+```bash
+brew services start bdombro/gws-mcp/gws-mcp
+brew services info gws-mcp
+brew services restart bdombro/gws-mcp/gws-mcp
+brew services stop bdombro/gws-mcp/gws-mcp
+```
+
+The endpoint is `http://127.0.0.1:8086/mcp`; logs are under
+`/opt/homebrew/var/log/`. To run in the foreground instead, use
+`gws-mcp http` (or `./build/bin/gws-mcp http` from a source checkout).
+Do not run the foreground server and service on the same port.
+Keep the default loopback bind; this is not a shared remote-host deployment.
+
+
+## Connect Your Agent
+
+After starting the service, add this server to OpenCode v2.2.6's
+`opencode.jsonc` (merge it with any existing servers):
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "gws-mcp": {
+        "type": "remote",
+        "url": "http://127.0.0.1:8086/mcp",
+        "protocol": "2026-07-28"
+      }
+    }
+  }
+}
+```
+
+Use either an explicit server entry or a plugin manifest, not both.
+Alternative client schemas and stdio configuration are in the
+[developer reference](docs/development.md). The compatibility notice above
+applies to every transport.
+
 
 ## Tools & CLI Commands
 
@@ -154,19 +164,34 @@ gws --profile work auth login --scopes "openid,email,profile,$G/calendar,$G/docu
 | `GWS_BIN` | `gws` | Path or binary name of the `gws` CLI executable |
 | `BUGSINK_DSN` | unset (disabled) | Error reporting DSN (`""` disables) |
 
-## Homebrew & Service Lifecycle
+## Troubleshooting
 
-`Formula/gws-mcp.rb` installs the binary and registers a background service listening on `http://127.0.0.1:8086/mcp` (logs at `$(brew --prefix)/var/log/gws-mcp.log`):
+- **Client cannot connect:** confirm it supports July MCP, the service is
+  running, and the client URL matches the configured port. OpenCode needs
+  `"protocol": "2026-07-28"`; old `initialize` clients will fail.
+- **Port occupied:** inspect the listener and stop only the service/process
+  you own, or deliberately choose another port and update the client URL.
+- **Works in a terminal, not as a service:** launchd does not inherit
+  `~/.zshrc`. Configure the service environment separately or use the
+  plugin's supported private configuration file; inspect
+  `/opt/homebrew/var/log/` for errors.
+- **Google authentication fails:** confirm the service can find the selected gws executable/profile and that the required scope was granted. Reauthorize through gws, not by pasting tokens into tool arguments.
+- **Source build cannot find vcpkg or slimr ports:** load the development
+  environment, bootstrap vcpkg, and register both slimr links and the pinned
+  libhv overlay. Never repair this by editing installed headers.
+- **Compiler/hardening check fails:** upgrade the Xcode toolchain; set
+  `CXX` before first configure. CMake caches the compiler, so an intentional
+  compiler change needs a fresh configuration tree.
 
-```bash
-just install          # Install formula (or install-local / reinstall-local from a local build)
-just start            # Start brew service and wait until http://127.0.0.1:8086/mcp responds
-just status           # Check brew services status
-just restart          # Restart service and wait for readiness
-just stop             # Stop brew service
-just uninstall        # Stop service and uninstall formula
-just check-formula    # Validate Formula/gws-mcp.rb Ruby syntax
-```
+
+## Development
+
+This section is for building or changing the server, not configuring an
+installed binary. [Architecture, transport reference and test details](docs/development.md)
+are separate from the user setup flow.
+
+<details>
+<summary>macOS source-build setup (vcpkg and local slimr overlays)</summary>
 
 ## macOS Build Prerequisites (vcpkg setup)
 
@@ -236,21 +261,14 @@ For runtime API access, separately install the
 as described above. Build/test commands neither authenticate Google nor start
 services; tests mock the CLI.
 
-## Building & Testing
+</details>
 
-Use Clang with C++26 and libc++ FAST hardening, CMake 3.31+, Ninja, [just](https://just.systems), a bootstrapped [vcpkg](https://vcpkg.io), Node, Ruby, and a compatible `clang-tidy` (set `CLANG_TIDY` if needed). Set `VCPKG_ROOT` and put vcpkg and the tools on `PATH`. Linux additionally needs `libc++` and `libc++abi`; select libc++ with `CXXFLAGS=-stdlib=libc++`.
-
-Dependencies are declared in `vcpkg.json` (`slimr-mcp` with the `http` feature). During local development, `(cd /absolute/path/to/slimr-cpp && just publish --local --all)` publishes ports into vcpkg's local overlay; export `VCPKG_OVERLAY_PORTS="$VCPKG_ROOT/local-ports"` in your shell. `just deps` installs into `build/deps/` for the detected native triplet. `configure` always runs it, with CMake manifest installation disabled. CMake links installed `slimr::mcp_http` and `slimr::test` targets, never source-header overrides.
+After the source build succeeds, stage and install the local Homebrew formula:
 
 ```bash
-just test      # Debug ASan/UBSan tests, with fatal undefined behavior reports
-just build     # Optimized IPO Release app and tests; build/bin/gws-mcp
-just lint      # App and test translation units using the Debug compilation database (honors $CLANG_TIDY)
-just test-mcp  # MCP 2026-07-28 conformance: stdio (mcp) + ephemeral HTTP (server/discover & tools/list)
-just run status
-just clean     # Remove build/ only; leaves user data untouched
+just install-local
 ```
 
-Debug and Release graphs live in `build/cmake/Debug/` and `build/cmake/Release/`; only Release apps are emitted to `build/bin/`. Set `CXX` before the first configure to choose a compiler; CMake retains its absolute path even when lint uses a different `PATH`. Both configurations enable libc++ hardening and zero automatic-variable initialization. `just test-mcp` isolates HOME/XDG directories under `build/`, clears credentials, disables error reporting and external CLI access, and cleans up afterward; it never invokes a live Google API tool.
-
-CI runs the same commands on native Linux/macOS. Configure `VCPKG_REF` to the tested full vcpkg commit SHA; slimr packages resolve from the public registry pinned in `vcpkg-configuration.json`, without a dependency token. Local macOS validation is not Linux execution evidence.
+Installing a formula and starting its service are separate actions.
+For a source-only foreground run, use
+`./build/bin/gws-mcp http`.

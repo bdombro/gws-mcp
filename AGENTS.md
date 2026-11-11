@@ -4,6 +4,14 @@ Written for: AI coding agents working in the `gws-mcp` C++26 plugin repository.
 
 `gws-mcp` is a C++26 MCP plugin (`2026-07-28` stdio + Streamable HTTP on `127.0.0.1:8086`) and CLI built on `slimr-cpp` that wraps the `gws` Google Workspace CLI (`posix_spawnp`), decodes Gmail MIME trees and HTML bodies into readable text, downloads attachments safely, and uploads files to Google Drive.
 
+
+## Documentation Upkeep
+
+When a change conflicts with `README.md`, update the affected README and its
+linked user/developer documentation in the same change. Keep examples,
+configuration, install/build commands and compatibility claims consistent
+with implemented behavior; do not claim unverified release or client support.
+
 ## Commands
 
 | Task | Command |
