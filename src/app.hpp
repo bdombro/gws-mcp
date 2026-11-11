@@ -370,11 +370,20 @@ inline std::string save_attachment(
     for (int n = 0; n < 1000; ++n) {
         std::string cand = (n == 0) ? name : (stem + "-" + std::to_string(n) + ext);
         fs::path p = dir / cand;
-        int fd = open(p.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0644);
-        if (fd >= 0) {
-            ssize_t written = write(fd, bytes.data(), bytes.size());
-            (void)written;
-            close(fd);
+        detail::UniqueFd fd(open(p.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0644));
+        if (fd) {
+            size_t total = 0;
+            while (total < bytes.size()) {
+                ssize_t written = write(fd.get(), bytes.data() + total, bytes.size() - total);
+                if (written < 0) {
+                    if (errno == EINTR) continue;
+                    int err = errno;
+                    fd.reset();
+                    fs::remove(p, ec);
+                    throw std::runtime_error("save_attachment write failed: " + std::string(strerror(err)));
+                }
+                total += static_cast<size_t>(written);
+            }
             return p.string();
         }
         if (errno != EEXIST) {

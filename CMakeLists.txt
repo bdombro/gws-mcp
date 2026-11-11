@@ -45,7 +45,7 @@ endif()
 
 add_executable(gws-mcp src/main.cpp)
 target_include_directories(gws-mcp PRIVATE src)
-target_link_libraries(gws-mcp PRIVATE slimr::mcp app_options)
+target_link_libraries(gws-mcp PRIVATE slimr::mcp_http app_options)
 set_target_properties(gws-mcp PROPERTIES
     INTERPROCEDURAL_OPTIMIZATION_RELEASE ON
     RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/build/bin")
@@ -54,7 +54,7 @@ if(BUILD_TESTING)
     find_package(slimr-test CONFIG REQUIRED)
     add_executable(gws_mcp_test tests/test_main.cpp)
     target_include_directories(gws_mcp_test PRIVATE src)
-    target_link_libraries(gws_mcp_test PRIVATE slimr::mcp slimr::test app_options)
+    target_link_libraries(gws_mcp_test PRIVATE slimr::mcp_http slimr::test app_options)
     set_target_properties(gws_mcp_test PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
     add_test(NAME gws_mcp COMMAND gws_mcp_test)
     set_tests_properties(gws_mcp PROPERTIES TIMEOUT 120

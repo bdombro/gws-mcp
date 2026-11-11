@@ -1,0 +1,13 @@
+{
+  "name": "gws-mcp",
+  "owner": {
+    "name": "Brian Dombrowski"
+  },
+  "plugins": [
+    {
+      "name": "gws-mcp",
+      "source": ".",
+      "description": "Google Workspace MCP server wrapping the gws CLI (Gmail, Calendar, Drive, Docs, Sheets, People, Tasks)"
+    }
+  ]
+}

@@ -19,6 +19,59 @@ extern char** environ;
 
 namespace gws {
 
+namespace detail {
+
+struct UniqueFd {
+    int fd{-1};
+    UniqueFd() = default;
+    explicit UniqueFd(int f) noexcept : fd(f) {}
+    UniqueFd(const UniqueFd&) = delete;
+    UniqueFd& operator=(const UniqueFd&) = delete;
+    UniqueFd(UniqueFd&& other) noexcept : fd(other.fd) { other.fd = -1; }
+    UniqueFd& operator=(UniqueFd&& other) noexcept {
+        if (this != &other) {
+            reset();
+            fd = other.fd;
+            other.fd = -1;
+        }
+        return *this;
+    }
+    ~UniqueFd() { reset(); }
+    void reset(int newFd = -1) noexcept {
+        if (fd >= 0) {
+            ::close(fd);
+        }
+        fd = newFd;
+    }
+    int get() const noexcept { return fd; }
+    int release() noexcept {
+        int out = fd;
+        fd = -1;
+        return out;
+    }
+    explicit operator bool() const noexcept { return fd >= 0; }
+};
+
+struct SpawnActionsGuard {
+    posix_spawn_file_actions_t actions{};
+    bool active{false};
+    SpawnActionsGuard() {
+        if (posix_spawn_file_actions_init(&actions) != 0) {
+            throw std::runtime_error("posix_spawn_file_actions_init failed");
+        }
+        active = true;
+    }
+    SpawnActionsGuard(const SpawnActionsGuard&) = delete;
+    SpawnActionsGuard& operator=(const SpawnActionsGuard&) = delete;
+    ~SpawnActionsGuard() {
+        if (active) {
+            posix_spawn_file_actions_destroy(&actions);
+        }
+    }
+};
+
+} // namespace detail
+
 class GwsError : public std::runtime_error {
 public:
     using std::runtime_error::runtime_error;
@@ -121,57 +174,62 @@ inline GwsRun exec_gws(const std::vector<std::string>& args, const std::string& 
     const char* bin_env = getenv("GWS_BIN");
     std::string bin = (bin_env && *bin_env) ? bin_env : "gws";
 
-    int stdout_pipe[2];
-    int stderr_pipe[2];
-    if (pipe(stdout_pipe) != 0 || pipe(stderr_pipe) != 0) {
+    int raw_out[2]{-1, -1};
+    if (pipe(raw_out) != 0) {
         throw GwsError("pipe failed: " + std::string(strerror(errno)));
     }
+    detail::UniqueFd out_read(raw_out[0]);
+    detail::UniqueFd out_write(raw_out[1]);
 
-    posix_spawn_file_actions_t actions;
-    posix_spawn_file_actions_init(&actions);
-    posix_spawn_file_actions_addclose(&actions, stdout_pipe[0]);
-    posix_spawn_file_actions_adddup2(&actions, stdout_pipe[1], STDOUT_FILENO);
-    posix_spawn_file_actions_addclose(&actions, stdout_pipe[1]);
+    int raw_err[2]{-1, -1};
+    if (pipe(raw_err) != 0) {
+        throw GwsError("pipe failed: " + std::string(strerror(errno)));
+    }
+    detail::UniqueFd err_read(raw_err[0]);
+    detail::UniqueFd err_write(raw_err[1]);
 
-    posix_spawn_file_actions_addclose(&actions, stderr_pipe[0]);
-    posix_spawn_file_actions_adddup2(&actions, stderr_pipe[1], STDERR_FILENO);
-    posix_spawn_file_actions_addclose(&actions, stderr_pipe[1]);
+    detail::SpawnActionsGuard spawn_guard;
+    posix_spawn_file_actions_addclose(&spawn_guard.actions, out_read.get());
+    posix_spawn_file_actions_adddup2(&spawn_guard.actions, out_write.get(), STDOUT_FILENO);
+    posix_spawn_file_actions_addclose(&spawn_guard.actions, out_write.get());
+
+    posix_spawn_file_actions_addclose(&spawn_guard.actions, err_read.get());
+    posix_spawn_file_actions_adddup2(&spawn_guard.actions, err_write.get(), STDERR_FILENO);
+    posix_spawn_file_actions_addclose(&spawn_guard.actions, err_write.get());
 
     if (!cwd.empty()) {
 #if defined(__APPLE__) && __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ >= 260000
-        posix_spawn_file_actions_addchdir(&actions, cwd.c_str());
+        posix_spawn_file_actions_addchdir(&spawn_guard.actions, cwd.c_str());
 #else
-        posix_spawn_file_actions_addchdir_np(&actions, cwd.c_str());
+        posix_spawn_file_actions_addchdir_np(&spawn_guard.actions, cwd.c_str());
 #endif
     }
 
     std::vector<char*> argv_ptrs;
+    argv_ptrs.reserve(args.size() + 2);
     argv_ptrs.push_back(const_cast<char*>(bin.c_str()));
     for (const auto& a : args) {
         argv_ptrs.push_back(const_cast<char*>(a.c_str()));
     }
     argv_ptrs.push_back(nullptr);
 
-    pid_t pid;
-    int spawn_ret = posix_spawnp(&pid, bin.c_str(), &actions, nullptr, argv_ptrs.data(), environ);
-    posix_spawn_file_actions_destroy(&actions);
+    pid_t pid = -1;
+    int spawn_ret = posix_spawnp(&pid, bin.c_str(), &spawn_guard.actions, nullptr, argv_ptrs.data(), environ);
 
-    close(stdout_pipe[1]);
-    close(stderr_pipe[1]);
+    out_write.reset();
+    err_write.reset();
 
     if (spawn_ret != 0) {
-        close(stdout_pipe[0]);
-        close(stderr_pipe[0]);
         std::string hint = (spawn_ret == ENOENT) ? (" (is " + bin + " installed and on PATH? set GWS_BIN to override)") : "";
         throw GwsError("Could not run " + bin + ": " + strerror(spawn_ret) + hint);
     }
 
     std::string stdout_str;
     std::string stderr_str;
-    struct pollfd fds[2];
-    fds[0].fd = stdout_pipe[0];
+    struct pollfd fds[2]{};
+    fds[0].fd = out_read.get();
     fds[0].events = POLLIN;
-    fds[1].fd = stderr_pipe[0];
+    fds[1].fd = err_read.get();
     fds[1].events = POLLIN;
 
     char buf[16384];
@@ -186,10 +244,11 @@ inline GwsRun exec_gws(const std::vector<std::string>& args, const std::string& 
             if (fds[i].fd >= 0 && (fds[i].revents & (POLLIN | POLLHUP | POLLERR))) {
                 ssize_t n = read(fds[i].fd, buf, sizeof(buf));
                 if (n > 0) {
-                    if (i == 0) stdout_str.append(buf, n);
-                    else stderr_str.append(buf, n);
+                    if (i == 0) stdout_str.append(buf, static_cast<size_t>(n));
+                    else stderr_str.append(buf, static_cast<size_t>(n));
                 } else {
-                    close(fds[i].fd);
+                    if (i == 0) out_read.reset();
+                    else err_read.reset();
                     fds[i].fd = -1;
                     open_fds--;
                 }
@@ -198,7 +257,7 @@ inline GwsRun exec_gws(const std::vector<std::string>& args, const std::string& 
     }
 
     int status = 0;
-    waitpid(pid, &status, 0);
+    while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {}
 
     GwsRun result;
     if (WIFEXITED(status)) {

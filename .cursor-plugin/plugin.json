@@ -1,0 +1,16 @@
+{
+  "name": "gws-mcp",
+  "displayName": "GWS MCP",
+  "description": "Google Workspace MCP server wrapping the gws CLI (Gmail, Calendar, Drive, Docs, Sheets, People, Tasks)",
+  "version": "2.0.0",
+  "author": {
+    "name": "Brian Dombrowski"
+  },
+  "homepage": "https://github.com/bdombro/gws-mcp",
+  "repository": "https://github.com/bdombro/gws-mcp",
+  "mcpServers": {
+    "gws-mcp": {
+      "url": "http://127.0.0.1:8086/mcp"
+    }
+  }
+}

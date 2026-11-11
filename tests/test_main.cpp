@@ -5,10 +5,17 @@
 #include "client.hpp"
 #include "html_to_text.hpp"
 #include "mime.hpp"
+#include <mcp_http.hpp>
 
+#include <arpa/inet.h>
+#include <atomic>
 #include <filesystem>
 #include <fstream>
+#include <netinet/in.h>
 #include <string>
+#include <sys/socket.h>
+#include <thread>
+#include <unistd.h>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -934,43 +941,241 @@ TEST_SUITE("PluginApp integration & MCP dispatch") {
         CHECK(tools.contains("status"));
     }
 
-    TEST_CASE("MCP initialize, tools/list, and tools/call dispatch") {
+    TEST_CASE("MCP 2026-07-28 server/discover, tools/list, tools/call, and legacy initialize rejection") {
         MockGws gws;
         gws.reply = [](const auto&, const auto&) {
             return GwsRun{.exitCode = 0, .stderrStr = "", .stdoutStr = "{\"profile\":\"bdombro\",\"version\":\"1.0.5\"}"};
         };
         auto app = make_google_gws_app(gws.runner());
 
-        // initialize
+        auto makeJulyReq = [](int id, std::string_view method, slimr::Json extraParams = slimr::Json::object_t{}) {
+            slimr::Json req = slimr::Json::object_t{};
+            req["jsonrpc"] = "2.0";
+            req["id"] = id;
+            req["method"] = std::string(method);
+            slimr::Json params = extraParams.is_object() ? std::move(extraParams) : slimr::Json(slimr::Json::object_t{});
+            slimr::Json meta = slimr::Json::object_t{};
+            meta["io.modelcontextprotocol/protocolVersion"] = "2026-07-28";
+            meta["io.modelcontextprotocol/clientCapabilities"] = slimr::Json::object_t{};
+            params["_meta"] = std::move(meta);
+            req["params"] = std::move(params);
+            return req;
+        };
+
+        // server/discover
+        auto discResp = app.dispatchMcpJson(makeJulyReq(1, "server/discover"));
+        CHECK(discResp["result"]["resultType"].get<std::string>() == "complete");
+        CHECK(discResp["result"]["supportedVersions"].get<slimr::Json::array_t>().size() == 1);
+        CHECK(discResp["result"]["supportedVersions"][0].get<std::string>() == "2026-07-28");
+        CHECK(discResp["result"]["_meta"]["io.modelcontextprotocol/serverInfo"]["name"].get<std::string>() == "gws-mcp");
+
+        // legacy initialize -> -32601
         slimr::Json initReq = slimr::Json::object_t{};
         initReq["jsonrpc"] = "2.0";
-        initReq["id"] = 1;
+        initReq["id"] = 2;
         initReq["method"] = "initialize";
         initReq["params"]["protocolVersion"] = "2025-11-25";
         auto initResp = app.dispatchMcpJson(initReq);
-        CHECK(initResp["result"]["protocolVersion"].get<std::string>() == "2025-11-25");
-        CHECK(initResp["result"]["serverInfo"]["name"].get<std::string>() == "gws-mcp");
+        CHECK(initResp["error"]["code"].get<int64_t>() == slimr::McpErrorCode::MethodNotFound);
 
         // tools/list
-        slimr::Json listReq = slimr::Json::object_t{};
-        listReq["jsonrpc"] = "2.0";
-        listReq["id"] = 2;
-        listReq["method"] = "tools/list";
-        auto listResp = app.dispatchMcpJson(listReq);
+        auto listResp = app.dispatchMcpJson(makeJulyReq(3, "tools/list"));
+        CHECK(listResp["result"]["resultType"].get<std::string>() == "complete");
         auto toolList = listResp["result"]["tools"].get<slimr::Json::array_t>();
         CHECK(toolList.size() == 7);
 
         // tools/call status
-        slimr::Json callReq = slimr::Json::object_t{};
-        callReq["jsonrpc"] = "2.0";
-        callReq["id"] = 3;
-        callReq["method"] = "tools/call";
-        callReq["params"]["name"] = "status";
-        callReq["params"]["arguments"] = slimr::Json::object_t{};
-        auto callResp = app.dispatchMcpJson(callReq);
+        slimr::Json callParams = slimr::Json::object_t{};
+        callParams["name"] = "status";
+        callParams["arguments"] = slimr::Json::object_t{};
+        auto callResp = app.dispatchMcpJson(makeJulyReq(4, "tools/call", std::move(callParams)));
         CHECK(callResp["result"]["isError"].get<bool>() == false);
         auto contents = callResp["result"]["content"].get<slimr::Json::array_t>();
         CHECK(contents.size() == 1);
         CHECK(contents[0]["text"].get<std::string>().find("\"version\":\"2.0.0\"") != std::string::npos);
+    }
+
+    TEST_CASE("CLI direct invocation and enable_http flag validation") {
+        MockGws gws;
+        auto app = make_google_gws_app(gws.runner());
+        slimr::enable_http(app, slimr::HttpServerOptions{.host = "127.0.0.1", .port = 8086});
+
+        // CLI status invocation
+        {
+            char arg0[] = "gws-mcp";
+            char arg1[] = "status";
+            char* argv[] = {arg0, arg1};
+            CHECK(app.run(2, argv) == 0);
+        }
+
+        // Refuses non-loopback bind host by default
+        {
+            char arg0[] = "gws-mcp";
+            char arg1[] = "http";
+            char arg2[] = "--host";
+            char arg3[] = "0.0.0.0";
+            char* argv[] = {arg0, arg1, arg2, arg3};
+            CHECK(app.run(4, argv) == 1);
+        }
+
+        // Refuses port 0 without --allow-ephemeral-port
+        {
+            char arg0[] = "gws-mcp";
+            char arg1[] = "http";
+            char arg2[] = "--port";
+            char arg3[] = "0";
+            char* argv[] = {arg0, arg1, arg2, arg3};
+            CHECK(app.run(4, argv) == 1);
+        }
+
+        // Unknown HTTP flag returns usage error 2
+        {
+            char arg0[] = "gws-mcp";
+            char arg1[] = "http";
+            char arg2[] = "--bogus";
+            char* argv[] = {arg0, arg1, arg2};
+            CHECK(app.run(3, argv) == 2);
+        }
+    }
+
+    TEST_CASE("Streamable HTTP discovery, tools/list, tools/call, security guards, and concurrent calls") {
+        struct HttpReply {
+            int status{0};
+            std::string body;
+        };
+        auto httpCall = [](uint16_t port,
+                           std::string_view method,
+                           std::string_view path,
+                           const std::vector<std::pair<std::string, std::string>>& headers,
+                           std::string_view body) -> HttpReply {
+            int rawFd = ::socket(AF_INET, SOCK_STREAM, 0);
+            if (rawFd < 0) return {};
+            detail::UniqueFd fd(rawFd);
+            sockaddr_in addr{};
+            addr.sin_family = AF_INET;
+            addr.sin_port = htons(port);
+            inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
+            if (::connect(fd.get(), reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
+                return {};
+            }
+            bool hasHost = false;
+            std::string req = std::string(method) + " " + std::string(path) + " HTTP/1.1\r\n";
+            for (const auto& [k, v] : headers) {
+                if (k == "Host") hasHost = true;
+                req += k + ": " + v + "\r\n";
+            }
+            if (!hasHost) req += "Host: 127.0.0.1:" + std::to_string(port) + "\r\n";
+            req += "Connection: close\r\n";
+            if (!body.empty()) req += "Content-Length: " + std::to_string(body.size()) + "\r\n";
+            req += "\r\n";
+            req.append(body);
+
+            size_t sent = 0;
+            while (sent < req.size()) {
+                ssize_t n = ::send(fd.get(), req.data() + sent, req.size() - sent, 0);
+                if (n <= 0) return {};
+                sent += static_cast<size_t>(n);
+            }
+            std::string raw;
+            char buf[4096];
+            for (;;) {
+                ssize_t n = ::recv(fd.get(), buf, sizeof(buf), 0);
+                if (n <= 0) break;
+                raw.append(buf, static_cast<size_t>(n));
+            }
+            auto hdrEnd = raw.find("\r\n\r\n");
+            if (hdrEnd == std::string::npos) return {};
+            auto lineEnd = raw.find("\r\n");
+            std::string statusLine = raw.substr(0, lineEnd);
+            auto sp = statusLine.find(' ');
+            int code = (sp != std::string::npos) ? std::atoi(statusLine.substr(sp + 1).c_str()) : 0;
+            return HttpReply{.status = code, .body = raw.substr(hdrEnd + 4)};
+        };
+        auto mcpHdrs = [](std::string_view m, std::string_view name = "") {
+            std::vector<std::pair<std::string, std::string>> h{
+                {"Content-Type", "application/json"},
+                {"Accept", "application/json, text/event-stream"},
+                {"MCP-Protocol-Version", "2026-07-28"},
+                {"Mcp-Method", std::string(m)},
+            };
+            if (!name.empty()) h.emplace_back("Mcp-Name", std::string(name));
+            return h;
+        };
+        auto makeReq = [](int id, std::string_view method, slimr::Json extra = slimr::Json::object_t{}) {
+            slimr::Json r = slimr::Json::object_t{};
+            r["jsonrpc"] = "2.0";
+            r["id"] = id;
+            r["method"] = std::string(method);
+            slimr::Json p = std::move(extra);
+            p["_meta"]["io.modelcontextprotocol/protocolVersion"] = "2026-07-28";
+            p["_meta"]["io.modelcontextprotocol/clientCapabilities"] = slimr::Json::object_t{};
+            r["params"] = std::move(p);
+            return slimr::write_json(r);
+        };
+
+        std::atomic<int> runnerCalls{0};
+        auto app = make_google_gws_app([&runnerCalls](const std::vector<std::string>&, const std::string&) {
+            ++runnerCalls;
+            return GwsRun{.exitCode = 0, .stderrStr = "", .stdoutStr = "{\"ok\":true}"};
+        });
+
+        slimr::McpHttpServer srv(app, slimr::HttpServerOptions{
+            .host = "127.0.0.1",
+            .port = 0,
+            .allowEphemeralPort = true,
+        });
+        std::string err;
+        REQUIRE(srv.start(&err));
+        const uint16_t port = srv.boundPort();
+        CHECK(port > 0);
+
+        // GET /mcp -> 405
+        CHECK(httpCall(port, "GET", "/mcp", {}, "").status == 405);
+        // Host DNS-rebinding -> 403
+        CHECK(httpCall(port, "POST", "/mcp", {{"Host", "evil.example"}, {"Content-Type", "application/json"}, {"Accept", "application/json, text/event-stream"}}, makeReq(1, "server/discover")).status == 403);
+        // Origin -> 403
+        CHECK(httpCall(port, "POST", "/mcp", {{"Origin", "https://evil.example"}, {"Content-Type", "application/json"}, {"Accept", "application/json, text/event-stream"}}, makeReq(1, "server/discover")).status == 403);
+
+        // server/discover -> 200
+        auto disc = httpCall(port, "POST", "/mcp", mcpHdrs("server/discover"), makeReq(1, "server/discover"));
+        CHECK(disc.status == 200);
+        auto discJson = slimr::parse_json<slimr::Json>(disc.body);
+        REQUIRE(discJson.has_value());
+        CHECK((*discJson)["result"]["_meta"]["io.modelcontextprotocol/serverInfo"]["name"].get<std::string>() == "gws-mcp");
+
+        // tools/list -> 200 (7 tools)
+        auto listRep = httpCall(port, "POST", "/mcp", mcpHdrs("tools/list"), makeReq(2, "tools/list"));
+        CHECK(listRep.status == 200);
+        auto listJson = slimr::parse_json<slimr::Json>(listRep.body);
+        REQUIRE(listJson.has_value());
+        CHECK((*listJson)["result"]["tools"].get<slimr::Json::array_t>().size() == 7);
+
+        // Concurrent HTTP calls across 4 threads
+        std::atomic<int> okCount{0};
+        std::vector<std::thread> threads;
+        for (int t = 0; t < 4; ++t) {
+            threads.emplace_back([&, t]() {
+                slimr::Json p = slimr::Json::object_t{};
+                p["name"] = "call";
+                p["arguments"] = slimr::Json::object_t{
+                    {"service", "tasks"},
+                    {"resource", slimr::Json::array_t{"tasklists"}},
+                    {"method", "list"},
+                };
+                auto rep = httpCall(port, "POST", "/mcp", mcpHdrs("tools/call", "call"), makeReq(10 + t, "tools/call", std::move(p)));
+                if (rep.status == 200) {
+                    auto j = slimr::parse_json<slimr::Json>(rep.body);
+                    if (j && (*j)["result"]["isError"].get<bool>() == false &&
+                        (*j)["result"]["content"][0]["text"].get<std::string>() == "{\"ok\":true}") {
+                        ++okCount;
+                    }
+                }
+            });
+        }
+        for (auto& th : threads) th.join();
+        CHECK(okCount.load() == 4);
+        CHECK(runnerCalls.load() == 4);
+
+        srv.stop();
     }
 }

@@ -2,6 +2,7 @@ build/
 /.ci/
 bin/
 dist/
+Formula/.staging/
 *.o
 *.gch
 *.dSYM

@@ -2,34 +2,40 @@
 
 Written for: AI coding agents working in the `gws-mcp` C++26 plugin repository.
 
-`gws-mcp` is a C++26 MCP plugin and CLI built on `slimr-cpp` that wraps the `gws` Google Workspace CLI (`posix_spawnp`), decodes Gmail MIME trees and HTML bodies into readable text, downloads attachments safely, and uploads files to Google Drive.
+`gws-mcp` is a C++26 MCP plugin (`2026-07-28` stdio + Streamable HTTP on `127.0.0.1:8086`) and CLI built on `slimr-cpp` that wraps the `gws` Google Workspace CLI (`posix_spawnp`), decodes Gmail MIME trees and HTML bodies into readable text, downloads attachments safely, and uploads files to Google Drive.
 
 ## Commands
 
 | Task | Command |
 | --- | --- |
-| Run unit & mock-runner tests (ASan + UBSan, no network) | `just test` |
+| Run unit, mock-runner, MCP `2026-07-28` & HTTP tests (ASan + UBSan, no network) | `just test` |
 | Build and test release binary (`build/bin/gws-mcp`) | `just build` |
-| Analyze app and test translation units | `just lint` |
-| Verify isolated MCP initialization and tool discovery | `just test-mcp` |
+| Analyze app and test translation units (`CLANG_TIDY` respected) | `just lint` |
+| Verify isolated MCP `2026-07-28` stdio + ephemeral HTTP discovery | `just test-mcp` |
+| Validate Homebrew formula Ruby syntax | `just check-formula` |
+| Manage local Homebrew service lifecycle (`127.0.0.1:8086`) | `just install-local` / `start` / `stop` / `status` / `uninstall` |
 | Clean build artifacts | `just clean` |
 
 ## Module Boundaries
 
 | Path | Owns | Must Not |
 | --- | --- | --- |
-| `src/main.cpp` | Entrypoint calling `gws::make_google_gws_app().run(argc, argv)` | Business logic |
+| `src/main.cpp` | Entrypoint calling `slimr::enable_http(app, {.host = "127.0.0.1", .port = 8086})` + `app.run(argc, argv)` | Business logic |
 | `src/app.hpp` | `make_google_gws_app()`, API method blocklist (`is_blocked_method`), path containment (`validate_upload_path`, `resolve_attachment_dest`), and typed C++ entrypoints (`gws::call`, `gws::gmail_message`, `gws::gmail_thread`, `gws::gmail_attachment`, `gws::drive_upload`, `gws::schema`, `gws::status`) | Bypass blocklists or path guards |
-| `src/client.hpp` | `GwsRunner`, `exec_gws` (`posix_spawnp` + `poll()`), `GWS_PROFILE` handling, keyring noise filtering, `cap_json` (100 KB limit) | Use `/bin/sh` or `popen` |
+| `src/client.hpp` | `GwsRunner`, `exec_gws` (`posix_spawnp` + `poll()`), RAII fd/spawn guards, `GWS_PROFILE` handling, keyring noise filtering, `cap_json` (100 KB limit) | Use `/bin/sh` or `popen` |
 | `src/mime.hpp` | Base64url decoding, recursive MIME part walking, charset decoding (UTF-8, ISO-8859-1), attachment listing | — |
 | `src/html_to_text.hpp` | HTML-to-readable-text conversion, hidden-element pruning (`display:none`, `visibility:hidden`, `opacity:0`, `font-size:0`, `hidden`), UTM query stripping, invisible Unicode removal | Retain hidden prompt-injection spans |
-| `tests/test_main.cpp` | 53 test cases using injected `GwsRunner` mocks and an isolated `/bin/pwd` cwd fixture | Spawn live `gws` calls in unit tests |
+| `tests/test_main.cpp` | Unit, mock-runner, CLI, MCP `2026-07-28`, and concurrent `McpHttpServer` test cases | Spawn live `gws` calls in unit tests |
+| `scripts/test-mcp.mjs` | Isolated stdio (`mcp`) + ephemeral HTTP (`http --port 0 --allow-ephemeral-port`) MCP `2026-07-28` test | Hit live Google APIs |
+| `Formula/gws-mcp.rb` & `scripts/dev-formula.mjs` | Homebrew formula (`service do` on `127.0.0.1:8086`, Homebrew `PATH`) and local formula staging | Embed secrets or run `git add -A` |
+| `.cursor-plugin/` & `.claude-plugin/` | Cursor and Claude HTTP plugin manifests (`http://127.0.0.1:8086/mcp`) | Include shell scripts or credentials |
 
 ## Safety & App Conventions
 
 1. **Never weaken the `call` blocklist:** `call` must always refuse sending mail/drafts (`users.messages.send`, `users.drafts.send`), modifying Gmail filters/forwarding/delegates, modifying Drive permissions or permanently deleting files (`permissions.*`, `files.delete`), modifying Calendar ACLs (`acl.*`), and running Apps Script (`script.scripts.run`).
 2. **Never use a shell:** `exec_gws` spawns `gws` directly via `posix_spawnp` and validates all service/resource/method tokens so flags cannot be injected.
-3. **Path containment:** `drive_upload` must refuse symlinks, non-regular files, files outside `$HOME` / temp dirs, hidden paths (`~/.ssh`, `~/.config`), and `~/Library`. `gmail_attachment` must always write inside `~/Downloads/gws/<messageId>/` and never overwrite an existing file (append `-1`, `-2`, …).
+3. **Path containment:** `drive-upload` must refuse symlinks, non-regular files, files outside `$HOME` / temp dirs, hidden paths (`~/.ssh`, `~/.config`), and `~/Library`. `gmail-attachment` must always write inside `~/Downloads/gws/<messageId>/` and never overwrite an existing file (append `-1`, `-2`, …).
+4. **Loopback auth boundary:** Keep `oauth.enabled = false` (`127.0.0.1:8086` loopback single-user mode); never add a persistent HTTP Google token broker database or mix MCP bearer tokens with Google access tokens.
 
 ## C++ Memory Safety
 
