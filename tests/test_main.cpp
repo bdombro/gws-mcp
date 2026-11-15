@@ -998,7 +998,7 @@ TEST_SUITE("PluginApp integration & MCP dispatch") {
     TEST_CASE("CLI direct invocation and enable_http flag validation") {
         MockGws gws;
         auto app = make_google_gws_app(gws.runner());
-        slimr::enable_http(app, slimr::HttpServerOptions{.host = "127.0.0.1", .port = 8086});
+        slimr::enable_http(app, slimr::HttpServerOptions{.host = "127.0.0.1", .port = 10006});
 
         // CLI status invocation
         {

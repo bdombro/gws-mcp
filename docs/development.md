@@ -19,12 +19,12 @@ plugins/gws-mcp/
 ├── vcpkg.json                      # Independently resolved dependencies (slimr-mcp[http])
 ├── CMakeLists.txt                  # App/test targets and transitive dependency linking (slimr::mcp_http)
 ├── justfile                        # CMake/Ninja, lint, test-mcp, and Homebrew service lifecycle
-├── Formula/gws-mcp.rb              # Homebrew formula + launchd service definition (127.0.0.1:8086)
+├── Formula/gws-mcp.rb              # Homebrew formula + launchd service definition (127.0.0.1:10006)
 ├── scripts/
 │   ├── dev-formula.mjs             # Local tarball formula staging helper
 │   └── test-mcp.mjs                # Stdio + ephemeral HTTP MCP 2026-07-28 conformance check
-├── .cursor-plugin/plugin.json      # Cursor plugin manifest (HTTP 127.0.0.1:8086/mcp)
-├── .claude-plugin/                 # Claude plugin & marketplace manifests (HTTP 127.0.0.1:8086/mcp)
+├── .cursor-plugin/plugin.json      # Cursor plugin manifest (HTTP 127.0.0.1:10006/mcp)
+├── .claude-plugin/                 # Claude plugin & marketplace manifests (HTTP 127.0.0.1:10006/mcp)
 ├── src/
 │   ├── client.hpp                  # `posix_spawnp` + `poll()` subprocess runner for `gws`, stderr noise filter, 100 KB cap
 │   ├── html_to_text.hpp            # Prompt-injection-hardened HTML-to-readable-text converter (strips hidden elements & UTM params)
@@ -39,7 +39,7 @@ plugins/gws-mcp/
 
 ### Libraries Used
 
-- **`<mcp.hpp>`, `<mcp_http.hpp>` & `<reflect.hpp>`:** Typed MCP `2026-07-28` tool definitions, compile-time JSON Schema generation, Streamable HTTP transport (`127.0.0.1:8086`), and narrow JSON CLI.
+- **`<mcp.hpp>`, `<mcp_http.hpp>` & `<reflect.hpp>`:** Typed MCP `2026-07-28` tool definitions, compile-time JSON Schema generation, Streamable HTTP transport (`127.0.0.1:10006`), and narrow JSON CLI.
 - **`<json.hpp>` (`glaze`):** Fast JSON parsing and 100 KB response capping (`cap_json`).
 - **`<bugsink.hpp>` (`-lcurl`):** Opt-in error reporting through `BUGSINK_DSN`.
 - **`<test.hpp>` (`doctest`):** Mock `GwsRunner`, CLI, and `McpHttpServer` test suite compiled with `-fsanitize=address,undefined`.
@@ -50,10 +50,10 @@ plugins/gws-mcp/
 `gws-mcp` implements the MCP **`2026-07-28`** specification over both stdio and Streamable HTTP:
 
 - **Breaking change (`2026-07-28`):** Session initialization (`initialize`), `notifications/initialized`, `MCP-Session-Id` headers, and SSE `GET`/`DELETE` streams are removed. Clients discover capabilities via `server/discover`, list tools via `tools/list`, and call tools via `tools/call`. On HTTP `POST /mcp`, callers must send `MCP-Protocol-Version: 2026-07-28` (and `Accept: application/json`), plus `Mcp-Method` (and `Mcp-Name` on `tools/call`). Calling `initialize` returns `-32601 Method not found`.
-- **Streamable HTTP (default port `8086`):**
+- **Streamable HTTP (default port `10006`):**
   ```bash
-  ./build/bin/gws-mcp http --host 127.0.0.1 --port 8086
-  # Endpoint: http://127.0.0.1:8086/mcp
+  ./build/bin/gws-mcp http --host 127.0.0.1 --port 10006
+  # Endpoint: http://127.0.0.1:10006/mcp
   ```
 - **Stdio MCP (`mcp`):**
   ```json
@@ -76,12 +76,12 @@ plugins/gws-mcp/
     "mcpServers": {
       "gws-mcp": {
         "type": "http",
-        "url": "http://127.0.0.1:8086/mcp"
+        "url": "http://127.0.0.1:10006/mcp"
       }
     }
   }
   ```
-- **Cursor / Claude plugins:** `.cursor-plugin/plugin.json`, `.claude-plugin/plugin.json`, and `.claude-plugin/marketplace.json` configure the HTTP server at `http://127.0.0.1:8086/mcp`. Note that host clients using these manifests must support MCP `2026-07-28` Streamable HTTP.
+- **Cursor / Claude plugins:** `.cursor-plugin/plugin.json`, `.claude-plugin/plugin.json`, and `.claude-plugin/marketplace.json` configure the HTTP server at `http://127.0.0.1:10006/mcp`. Note that host clients using these manifests must support MCP `2026-07-28` Streamable HTTP.
 
 ## Building & Testing
 

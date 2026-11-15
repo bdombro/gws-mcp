@@ -16,7 +16,7 @@ class GwsMcp < Formula
   end
 
   service do
-    run [opt_bin/"gws-mcp", "http", "--host", "127.0.0.1", "--port", "8086"]
+    run [opt_bin/"gws-mcp", "http", "--host", "127.0.0.1", "--port", "10006"]
     keep_alive true
     working_dir var/"gws-mcp"
     log_path var/"log/gws-mcp.log"

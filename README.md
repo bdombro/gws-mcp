@@ -28,7 +28,7 @@ After setup, ask your agent:
 - Call Workspace APIs, inspect their schemas, read Gmail messages and threads, and download attachments.
 - Upload local files to Drive, creating folder paths when needed.
 - Blocks selected sending, sharing, deletion, and script-execution operations.
-- Small footprint: a standalone C++26 binary exposing CLI, stdio MCP, and Streamable HTTP (`127.0.0.1:8086`); the `gws` CLI is the only runtime service dependency.
+- Small footprint: a standalone C++26 binary exposing CLI, stdio MCP, and Streamable HTTP (`127.0.0.1:10006`); the `gws` CLI is the only runtime service dependency.
 
 ## Installation
 
@@ -69,7 +69,7 @@ brew services restart bdombro/gws-mcp/gws-mcp
 brew services stop bdombro/gws-mcp/gws-mcp
 ```
 
-The endpoint is `http://127.0.0.1:8086/mcp`; logs are under
+The endpoint is `http://127.0.0.1:10006/mcp`; logs are under
 `/opt/homebrew/var/log/`. To run in the foreground instead, use
 `gws-mcp http` (or `./build/bin/gws-mcp http` from a source checkout).
 Do not run the foreground server and service on the same port.
@@ -87,7 +87,7 @@ After starting the service, add this server to OpenCode v2.2.6's
     "servers": {
       "gws-mcp": {
         "type": "remote",
-        "url": "http://127.0.0.1:8086/mcp",
+        "url": "http://127.0.0.1:10006/mcp",
         "protocol": "2026-07-28"
       }
     }
@@ -146,7 +146,7 @@ Every tool is available over MCP (`gws-mcp mcp` or `gws-mcp http`) and on the CL
 
 ## Authentication & Security Boundary
 
-`gws-mcp` runs in **loopback single-user mode** (`127.0.0.1:8086`) protected by loopback binding plus `Host`/`Origin` DNS-rebinding checks in `slimr::mcp_http`:
+`gws-mcp` runs in **loopback single-user mode** (`127.0.0.1:10006`) protected by loopback binding plus `Host`/`Origin` DNS-rebinding checks in `slimr::mcp_http`:
 
 - Credentials live with your local `gws` CLI profile on the host (`gws auth login`). `gws-mcp` does **not** run a persistent HTTP Google token broker database, does **not** accept or store external Google OAuth tokens over HTTP, and does **not** enable or claim standard MCP OAuth (`oauth.enabled = false`).
 - Because `brew services` runs under `launchd` with a minimal environment, [`Formula/gws-mcp.rb`](Formula/gws-mcp.rb) sets `PATH` to `#{HOMEBREW_PREFIX}/bin:/usr/bin:/bin` so `gws` is resolved automatically when installed via Homebrew. Set `GWS_PROFILE` (or `GWS_BIN`) in your shell or service environment if you use a non-default profile or custom `gws` path.

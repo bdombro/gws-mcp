@@ -7,7 +7,7 @@ triplet := f'{{architecture}}-{{system}}'
 compiler := if os() == "macos" { "/usr/bin/clang++" } else { "clang++" }
 tap := "bdombro/gws-mcp"
 formula := "gws-mcp"
-endpoint := "http://127.0.0.1:8086/mcp"
+endpoint := "http://127.0.0.1:10006/mcp"
 
 _:
     @just --list
