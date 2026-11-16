@@ -2,7 +2,7 @@
 
 Written for: AI coding agents working in the `gws-mcp` C++26 plugin repository.
 
-`gws-mcp` is a C++26 MCP plugin (`2026-07-28` stdio + Streamable HTTP on port `10006`) and CLI built on `slimr-mcp` that wraps the `gws` Google Workspace CLI (`posix_spawnp`), decodes Gmail MIME trees and HTML bodies into readable text, downloads attachments safely, and uploads files to Google Drive.
+`gws-mcp` is a C++26 MCP plugin (`2026-07-28` Streamable HTTP on port `10006`) and CLI built on `slimr-mcp` that wraps the `gws` Google Workspace CLI (`posix_spawnp`), decodes Gmail MIME trees and HTML bodies into readable text, downloads attachments safely, and uploads files to Google Drive.
 
 <!-- cpp-templates:begin -->
 ## Tooling alignment
@@ -81,7 +81,7 @@ with implemented behavior; do not claim unverified release or client support.
 | `src/mime.hpp` | Base64url decoding, recursive MIME part walking, charset decoding (UTF-8, ISO-8859-1), attachment listing | — |
 | `src/html_to_text.hpp` | HTML-to-readable-text conversion, hidden-element pruning (`display:none`, `visibility:hidden`, `opacity:0`, `font-size:0`, `hidden`), UTM query stripping, invisible Unicode removal | Retain hidden prompt-injection spans |
 | `tests/test_main.cpp` | Unit, mock-runner, CLI, MCP `2026-07-28`, and concurrent `McpHttpServer` test cases | Spawn live `gws` calls in unit tests |
-| `scripts/test-mcp.ts` | Isolated stdio (`mcp`) + ephemeral HTTP (`http --port 0`) MCP `2026-07-28` test | Hit live Google APIs |
+| `scripts/test-mcp.ts` | Isolated ephemeral HTTP (`http --port 0`) MCP `2026-07-28` test | Hit live Google APIs |
 | `Formula/gws-mcp.rb` | Homebrew formula (`service do` on port `10006`, Homebrew `PATH`, `--log-file`) | Embed secrets |
 | `.cursor-plugin/` & `.claude-plugin/` | Cursor and Claude HTTP plugin manifests (`http://127.0.0.1:10006/mcp`) | Include shell scripts or credentials |
 

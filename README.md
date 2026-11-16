@@ -43,7 +43,7 @@ Add to `.mcp.json` (or `opencode.jsonc` with `"protocol": "2026-07-28"`):
 }
 ```
 
-Or run over stdio (`gws-mcp mcp`) or direct CLI (`gws-mcp <tool> ['{"arg":"val"}']`).
+Or invoke tools directly via CLI (`gws-mcp <tool> ['{"arg":"val"}']`).
 
 ### Tools & CLI Commands
 

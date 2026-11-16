@@ -1008,6 +1008,11 @@ TEST_SUITE("PluginApp integration & MCP dispatch") {
         CHECK(listResp["result"]["resultType"].get<std::string>() == "complete");
         auto toolList = listResp["result"]["tools"].get<slimr::Json::array_t>();
         CHECK(toolList.size() == 7);
+        for (const auto &entry : toolList) {
+            const auto name = entry["name"].get<std::string>();
+            const bool typed = (name != "call" && name != "schema");
+            CHECK(entry.contains("outputSchema") == typed);
+        }
 
         // tools/call status
         slimr::Json callParams = slimr::Json::object_t{};
@@ -1015,6 +1020,7 @@ TEST_SUITE("PluginApp integration & MCP dispatch") {
         callParams["arguments"] = slimr::Json::object_t{};
         auto callResp = app.dispatchMcpJson(makeJulyReq(4, "tools/call", std::move(callParams)));
         CHECK(callResp["result"]["isError"].get<bool>() == false);
+        CHECK(callResp["result"]["structuredContent"]["version"].get<std::string>() == GWS_APP_VERSION);
         auto contents = callResp["result"]["content"].get<slimr::Json::array_t>();
         CHECK(contents.size() == 1);
         CHECK(contents[0]["text"].get<std::string>().find(std::string("\"version\":\"") + GWS_APP_VERSION + "\"") != std::string::npos);
