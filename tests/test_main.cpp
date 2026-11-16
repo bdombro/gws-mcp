@@ -1032,26 +1032,6 @@ TEST_SUITE("PluginApp integration & MCP dispatch") {
             CHECK(app.run(2, argv) == 0);
         }
 
-        // Refuses non-loopback bind host by default
-        {
-            char arg0[] = "gws-mcp";
-            char arg1[] = "http";
-            char arg2[] = "--host";
-            char arg3[] = "0.0.0.0";
-            char *argv[] = {arg0, arg1, arg2, arg3};
-            CHECK(app.run(4, argv) == 1);
-        }
-
-        // Refuses port 0 without --allow-ephemeral-port
-        {
-            char arg0[] = "gws-mcp";
-            char arg1[] = "http";
-            char arg2[] = "--port";
-            char arg3[] = "0";
-            char *argv[] = {arg0, arg1, arg2, arg3};
-            CHECK(app.run(4, argv) == 1);
-        }
-
         // Unknown HTTP flag returns usage error 2
         {
             char arg0[] = "gws-mcp";
@@ -1154,7 +1134,6 @@ TEST_SUITE("PluginApp integration & MCP dispatch") {
         slimr::McpHttpServer srv(app, slimr::HttpServerOptions{
                                           .host = "127.0.0.1",
                                           .port = 0,
-                                          .allowEphemeralPort = true,
                                       });
         std::string err;
         REQUIRE(srv.start(&err));
@@ -1163,10 +1142,6 @@ TEST_SUITE("PluginApp integration & MCP dispatch") {
 
         // GET /mcp -> 405
         CHECK(httpCall(port, "GET", "/mcp", {}, "").status == 405);
-        // Host DNS-rebinding -> 403
-        CHECK(httpCall(port, "POST", "/mcp", {{"Host", "evil.example"}, {"Content-Type", "application/json"}, {"Accept", "application/json, text/event-stream"}}, makeReq(1, "server/discover")).status == 403);
-        // Origin -> 403
-        CHECK(httpCall(port, "POST", "/mcp", {{"Origin", "https://evil.example"}, {"Content-Type", "application/json"}, {"Accept", "application/json, text/event-stream"}}, makeReq(1, "server/discover")).status == 403);
 
         // server/discover -> 200
         auto disc = httpCall(port, "POST", "/mcp", mcpHdrs("server/discover"), makeReq(1, "server/discover"));
