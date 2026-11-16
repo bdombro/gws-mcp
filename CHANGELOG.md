@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Embed VERSION into binary (`--version` / `status`) and tag Bugsink events with `gws-mcp@<version>`
+- Bind HTTP server to 0.0.0.0:10006 by default (pass --host 127.0.0.1 for loopback-only)
 - Add `--log-file` redirection and 10 MiB log rotation for the HTTP service
 - HTTP server no longer rejects non-loopback hosts, port 0, or foreign Host/Origin headers (slimr-mcp upgrade)
 - Internal: align build, CI, Homebrew formula, and documentation with cpp-templates
