@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Internal: pin `slimr-mcp` v0.2.0 and `slimr-serve` v0.1.1 baselines and remove temporary `overlay-ports`.
 - Migrate to `slimr-serve` / `slimr-mcp` typed output schemas (`outputSchema` / `structuredContent`) and drop stdio `mcp` mode.
 - Re-enable direct CLI tool calls (`gws-mcp <tool> '{...}'`), now opt-in since `slimr-mcp` v0.1.4
 - Internal: upgrade to `slimr-mcp` v0.1.3 (`cpp-httplib`) and `slimr-bugsink` v0.1.2, dropping `libhv` and `slimr-curl`.
