@@ -5,6 +5,7 @@
 #include "client.hpp"
 #include "html_to_text.hpp"
 #include "mime.hpp"
+#include "test_log_file.hpp"
 #include <mcp_http.hpp>
 
 #include <arpa/inet.h>
