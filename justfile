@@ -1,159 +1,114 @@
-set shell := ["zsh", "-f", "-eu", "-o", "pipefail", "-c"]
+set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 set positional-arguments
 
-architecture := replace(replace(arch(), "aarch64", "arm64"), "x86_64", "x64")
-system := if os() == "macos" { "osx" } else { os() }
-triplet := f'{{architecture}}-{{system}}'
-compiler := if os() == "macos" { "/usr/bin/clang++" } else { "clang++" }
-tap := "bdombro/gws-mcp"
 formula := "gws-mcp"
 endpoint := "http://127.0.0.1:10006/mcp"
+tools := "call,schema,gmail-message,gmail-thread,gmail-attachment,drive-upload,status"
+test_target := "gws_mcp_test"
+platforms := "macos linux"
+required := "brew bun cmake gh git jq just ninja vcpkg"
+log := `brew --prefix` + "/var/log/" + formula + ".log"
+llvm := env("LLVM_BIN", `brew --prefix llvm@23` + "/bin")
+cxx := env("CXX", if os() == "macos" { "/usr/bin/clang++" } else { llvm + "/clang++" })
+triplet := replace(replace(arch(), "aarch64", "arm64"), "x86_64", "x64") + if os() == "macos" { "-osx" } else { "-linux" }
+deps_env := if os() == "linux" { "CC=\"" + llvm + "/clang\" CXX=\"" + cxx + "\" LIBCXX_DIR=\"$(dirname \"$(\"" + cxx + "\" -print-file-name=libc++.so)\")\" " } else { "" }
+discover := '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'
 
 _:
     @just --list
 
-deps:
-    vcpkg install --x-wait-for-lock --triplet={{triplet}} --x-install-root=build/deps
+# Poll the endpoint until server/discover answers
+_wait-ready:
+    for _ in $(seq 30); do just _probe >/dev/null 2>&1 && exit 0; sleep 0.2; done; echo "Timed out waiting for {{ endpoint }}" >&2; exit 1
 
-configure configuration="Debug": deps
-    CXX="${CXX:-{{compiler}}}" cmake -S . -B build/cmake/{{configuration}} -G Ninja \
-        -DCMAKE_BUILD_TYPE={{configuration}} \
-        -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
-        -DVCPKG_MANIFEST_MODE=OFF \
-        -DVCPKG_INSTALLED_DIR="{{justfile_directory()}}/build/deps" \
-        -DVCPKG_TARGET_TRIPLET={{triplet}} \
-        -DENABLE_SANITIZERS={{if configuration == "Debug" { "ON" } else { "OFF" }}}
+# POST server/discover to the endpoint
+_probe:
+    curl -fsS -X POST "{{ endpoint }}" -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -H "MCP-Protocol-Version: 2026-07-28" -H "Mcp-Method: server/discover" -d '{{ discover }}'
 
-test: (configure "Debug")
-    cmake --build build/cmake/Debug --parallel 2
-    ctest --test-dir build/cmake/Debug --output-on-failure --no-tests=error
-
+# Compile the Release binary into build/bin (no tests)
 build: (configure "Release")
     cmake --build build/cmake/Release --parallel 2
-    ctest --test-dir build/cmake/Release --output-on-failure --no-tests=error
 
-lint: (configure "Debug")
-    "${CLANG_TIDY:-clang-tidy}" -p build/cmake/Debug src/main.cpp tests/test_main.cpp
-
-test-mcp: build
-    node scripts/test-mcp.mjs build/bin/gws-mcp call,schema,gmail-message,gmail-thread,gmail-attachment,drive-upload,status
-
-check-formula:
-    ruby -c Formula/{{formula}}.rb
-
-run *args:
-    ./build/bin/gws-mcp "$@"
-
+# Remove build output
 clean:
     rm -rf build
 
-install: install-local
+# Configure CMake (Debug enables ASan + UBSan)
+configure configuration="Debug": deps
+    CXX="{{ cxx }}" cmake -S . -B build/cmake/{{ configuration }} -G Ninja -DCMAKE_BUILD_TYPE={{ configuration }} -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_MANIFEST_MODE=OFF -DVCPKG_INSTALLED_DIR="{{ justfile_directory() }}/build/deps" -DVCPKG_TARGET_TRIPLET={{ triplet }} -DENABLE_SANITIZERS={{ if configuration == "Debug" { "ON" } else { "OFF" } }}
 
-install-local: build
-    #!/usr/bin/env bash
-    set -euo pipefail
-    brew_prefix="$(brew --prefix)"
-    tap_path="$brew_prefix/Library/Taps/bdombro/homebrew-{{formula}}"
-    mkdir -p "$(dirname "$tap_path")"
-    ln -sfn '{{justfile_directory()}}' "$tap_path"
-    trap 'node scripts/dev-formula.mjs reset' EXIT
-    node scripts/dev-formula.mjs install
-    if brew list --formula "{{tap}}/{{formula}}" >/dev/null 2>&1; then
-        HOMEBREW_NO_ASK=1 brew reinstall --formula "{{tap}}/{{formula}}"
-    else
-        HOMEBREW_NO_ASK=1 brew install --formula "{{tap}}/{{formula}}"
-    fi
+# Follow the service log
+daemon-logs:
+    tail -n 100 -f "{{ log }}"
 
-reinstall-local: build
-    #!/usr/bin/env bash
-    set -euo pipefail
-    was_running=0
-    if brew services info "{{formula}}" --json 2>/dev/null | grep -q '"running":[[:space:]]*true'; then
-        was_running=1
-    fi
-    brew_prefix="$(brew --prefix)"
-    tap_path="$brew_prefix/Library/Taps/bdombro/homebrew-{{formula}}"
-    mkdir -p "$(dirname "$tap_path")"
-    ln -sfn '{{justfile_directory()}}' "$tap_path"
-    trap 'node scripts/dev-formula.mjs reset' EXIT
-    node scripts/dev-formula.mjs install
-    HOMEBREW_NO_ASK=1 brew reinstall --formula "{{tap}}/{{formula}}"
-    if [[ "$was_running" -eq 1 ]]; then
-        just restart
-    fi
-
-start:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    brew services start "{{tap}}/{{formula}}"
+# Restart the service and wait until ready
+daemon-restart:
+    brew services stop {{ formula }}
+    brew services start {{ formula }}
     just _wait-ready
 
-stop:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    if brew services info "{{formula}}" --json 2>/dev/null | grep -q '"loaded":[[:space:]]*true'; then
-        brew services stop "{{tap}}/{{formula}}"
-    else
-        echo "{{formula}} service is not loaded"
-    fi
-
-restart:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    brew services restart "{{tap}}/{{formula}}"
+# Register the service to run at login, start it, and wait until ready
+daemon-start:
+    brew services start {{ formula }}
     just _wait-ready
 
-status:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    echo "=== Homebrew service ==="
-    if brew list --formula "{{formula}}" >/dev/null 2>&1; then
-        brew services info "{{formula}}"
-    else
-        echo "{{formula}} is not installed via Homebrew"
-    fi
-    echo "=== HTTP endpoint ({{endpoint}}) ==="
-    if curl -fsS -X POST "{{endpoint}}" \
-        -H "Content-Type: application/json" \
-        -H "Accept: application/json, text/event-stream" \
-        -H "MCP-Protocol-Version: 2026-07-28" \
-        -H "Mcp-Method: server/discover" \
-        -d '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'; then
-        echo ""
-    else
-        echo "Endpoint unreachable"
-        exit 1
-    fi
+# Show brew service state and probe the live endpoint
+daemon-status:
+    brew services info {{ formula }} || true
+    just _probe
 
+# Stop the service and unregister it, so it won't start at login
+daemon-stop:
+    brew services stop {{ formula }}
+
+# Install vcpkg dependencies into build/deps
+deps:
+    {{ deps_env }}vcpkg install --x-wait-for-lock --overlay-triplets=triplets --triplet={{ triplet }} --x-install-root=build/deps
+
+# Check required tools, C++26 support and env vars, printing fixes
+doctor:
+    LLVM_BIN="{{ llvm }}" bash scripts/doctor.sh {{ required }}
+
+# Format C++ sources and this justfile
+fmt:
+    git ls-files -co --exclude-standard '*.cpp' '*.hpp' | xargs "{{ llvm }}/clang-format" -i
+    just --fmt --unstable
+
+# Clean-install the released binary from GitHub exactly as users do, test it, then start the service
+install: uninstall
+    brew tap bdombro/{{ formula }} https://github.com/bdombro/{{ formula }}
+    brew install bdombro/{{ formula }}/{{ formula }}
+    brew test bdombro/{{ formula }}/{{ formula }}
+    just daemon-start
+
+# Check formatting, then lint with clang-tidy
+lint: (configure "Debug")
+    git ls-files -co --exclude-standard '*.cpp' '*.hpp' | xargs "{{ llvm }}/clang-format" --dry-run --Werror
+    just --fmt --check --unstable
+    "{{ llvm }}/clang-tidy" -p build/cmake/Debug src/main.cpp
+
+# Release on GitHub (tests per platform, version bump, changelog, build, formula, tag), then pull the release commit
+release bump:
+    gh workflow run release.yml -f bump="$1"
+    sleep 5; id="$(gh run list --workflow release.yml --limit 1 --json databaseId -q '.[0].databaseId')"; if [ -t 1 ]; then gh run watch --compact --exit-status "$id"; else gh run watch --exit-status "$id" >/dev/null; fi || { gh run view "$id" --log-failed | tail -n 100; exit 1; }
+    git pull --ff-only
+
+# Debug build with ASan + UBSan, then run all tests, or only doctest cases matching filter
+test filter="": (configure "Debug")
+    if [ -z "$1" ]; then cmake --build build/cmake/Debug --parallel 2 && BUGSINK_DSN= ctest --test-dir build/cmake/Debug --output-on-failure --no-tests=error; else cmake --build build/cmake/Debug --target {{ test_target }} --parallel 2 && BUGSINK_DSN= build/cmake/Debug/{{ test_target }} -tc="$1"; fi
+
+# Isolated MCP stdio + HTTP startup check against build/bin
+test-mcp: build
+    bun scripts/test-mcp.ts build/bin/{{ formula }} {{ tools }}
+
+# Stop the service, uninstall the formula, remove the tap
 uninstall:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    if brew services info "{{formula}}" --json 2>/dev/null | grep -q '"loaded":[[:space:]]*true'; then
-        brew services stop "{{tap}}/{{formula}}"
-    fi
-    if brew list --formula "{{tap}}/{{formula}}" >/dev/null 2>&1; then
-        HOMEBREW_NO_ASK=1 brew uninstall --formula "{{tap}}/{{formula}}"
-    elif brew list --formula "{{formula}}" >/dev/null 2>&1; then
-        HOMEBREW_NO_ASK=1 brew uninstall --formula "{{formula}}"
-    fi
-    if brew tap | grep -qx "{{tap}}"; then
-        HOMEBREW_NO_ASK=1 brew untap "{{tap}}"
-    fi
+    brew services stop {{ formula }} || true
+    brew uninstall {{ formula }} || true
+    brew untap bdombro/{{ formula }} || true
 
-_wait-ready:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    for _ in {1..30}; do
-        if curl -fsS -X POST "{{endpoint}}" \
-            -H "Content-Type: application/json" \
-            -H "Accept: application/json, text/event-stream" \
-            -H "MCP-Protocol-Version: 2026-07-28" \
-            -H "Mcp-Method: server/discover" \
-            -d '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}' >/dev/null 2>&1; then
-            echo "Ready at {{endpoint}}"
-            exit 0
-        fi
-        sleep 0.2
-    done
-    echo "Timed out waiting for {{endpoint}}" >&2
-    exit 1
+# Move vcpkg registry baselines to latest, then run tests (no commit)
+upgrade-deps:
+    git -C "$VCPKG_ROOT" pull --ff-only
+    vcpkg x-update-baseline --x-install-root=build/deps
+    just test
