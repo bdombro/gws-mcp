@@ -15,7 +15,7 @@
 #include <unistd.h>
 #include <vector>
 
-extern char** environ;
+extern char **environ;
 
 namespace gws {
 
@@ -25,10 +25,10 @@ struct UniqueFd {
     int fd{-1};
     UniqueFd() = default;
     explicit UniqueFd(int f) noexcept : fd(f) {}
-    UniqueFd(const UniqueFd&) = delete;
-    UniqueFd& operator=(const UniqueFd&) = delete;
-    UniqueFd(UniqueFd&& other) noexcept : fd(other.fd) { other.fd = -1; }
-    UniqueFd& operator=(UniqueFd&& other) noexcept {
+    UniqueFd(const UniqueFd &) = delete;
+    UniqueFd &operator=(const UniqueFd &) = delete;
+    UniqueFd(UniqueFd &&other) noexcept : fd(other.fd) { other.fd = -1; }
+    UniqueFd &operator=(UniqueFd &&other) noexcept {
         if (this != &other) {
             reset();
             fd = other.fd;
@@ -61,8 +61,8 @@ struct SpawnActionsGuard {
         }
         active = true;
     }
-    SpawnActionsGuard(const SpawnActionsGuard&) = delete;
-    SpawnActionsGuard& operator=(const SpawnActionsGuard&) = delete;
+    SpawnActionsGuard(const SpawnActionsGuard &) = delete;
+    SpawnActionsGuard &operator=(const SpawnActionsGuard &) = delete;
     ~SpawnActionsGuard() {
         if (active) {
             posix_spawn_file_actions_destroy(&actions);
@@ -73,7 +73,7 @@ struct SpawnActionsGuard {
 } // namespace detail
 
 class GwsError : public std::runtime_error {
-public:
+  public:
     using std::runtime_error::runtime_error;
 };
 
@@ -84,11 +84,11 @@ struct GwsRun {
     std::string stdoutStr;
 };
 
-using GwsRunner = std::function<GwsRun(const std::vector<std::string>& args, const std::string& cwd)>;
+using GwsRunner = std::function<GwsRun(const std::vector<std::string> &args, const std::string &cwd)>;
 
 constexpr size_t MAX_RESULT_BYTES = 100'000;
 
-inline slimr::Json cap_json(const slimr::Json& value, std::string_view hint, size_t limitBytes = MAX_RESULT_BYTES) {
+inline slimr::Json cap_json(const slimr::Json &value, std::string_view hint, size_t limitBytes = MAX_RESULT_BYTES) {
     std::string text = slimr::write_json(value);
     size_t bytes = text.size();
     if (bytes <= limitBytes) {
@@ -109,7 +109,7 @@ inline std::vector<std::string> profile_args(std::optional<std::string> profile 
     if (profile.has_value()) {
         resolved = *profile;
     } else {
-        const char* env_p = getenv("GWS_PROFILE");
+        const char *env_p = getenv("GWS_PROFILE");
         resolved = env_p ? std::string(env_p) : "";
     }
     if (resolved.empty()) {
@@ -118,11 +118,11 @@ inline std::vector<std::string> profile_args(std::optional<std::string> profile 
     return {"--profile", resolved};
 }
 
-inline std::string describe_failure(const GwsRun& run, const std::string& stdoutStr) {
+inline std::string describe_failure(const GwsRun &run, const std::string &stdoutStr) {
     try {
         auto parsed = slimr::parse_json<slimr::Json>(stdoutStr);
         if (parsed && parsed->is_object() && parsed->contains("error") && (*parsed)["error"].is_object()) {
-            const auto& errObj = (*parsed)["error"];
+            const auto &errObj = (*parsed)["error"];
             if (errObj.contains("message") && errObj["message"].is_string()) {
                 std::string msg = errObj["message"].get<std::string>();
                 std::string tag;
@@ -134,10 +134,12 @@ inline std::string describe_failure(const GwsRun& run, const std::string& stdout
                     }
                 }
                 if (errObj.contains("reason") && errObj["reason"].is_string()) {
-                    if (!tag.empty()) tag += " ";
+                    if (!tag.empty())
+                        tag += " ";
                     tag += errObj["reason"].get<std::string>();
                 }
-                while (!msg.empty() && (msg.back() == '\r' || msg.back() == '\n' || msg.back() == ' ')) msg.pop_back();
+                while (!msg.empty() && (msg.back() == '\r' || msg.back() == '\n' || msg.back() == ' '))
+                    msg.pop_back();
                 return "gws error" + (tag.empty() ? "" : " (" + tag + ")") + ": " + msg;
             }
         }
@@ -149,18 +151,23 @@ inline std::string describe_failure(const GwsRun& run, const std::string& stdout
     std::stringstream ss(run.stderrStr);
     std::string line;
     while (std::getline(ss, line)) {
-        while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
-        if (line.empty()) continue;
-        if (line.starts_with("Using keyring backend")) continue;
+        while (!line.empty() && (line.back() == '\r' || line.back() == ' '))
+            line.pop_back();
+        if (line.empty())
+            continue;
+        if (line.starts_with("Using keyring backend"))
+            continue;
         cleanLines.push_back(line);
     }
 
     std::string cleaned;
     for (size_t i = 0; i < cleanLines.size(); ++i) {
-        if (i > 0) cleaned += "\n";
+        if (i > 0)
+            cleaned += "\n";
         cleaned += cleanLines[i];
     }
-    while (!cleaned.empty() && (cleaned.back() == '\r' || cleaned.back() == '\n' || cleaned.back() == ' ')) cleaned.pop_back();
+    while (!cleaned.empty() && (cleaned.back() == '\r' || cleaned.back() == '\n' || cleaned.back() == ' '))
+        cleaned.pop_back();
 
     std::string status = run.signal.has_value() ? ("signal " + *run.signal) : ("exit " + std::to_string(run.exitCode));
     std::string out = "gws failed (" + status + ")";
@@ -170,8 +177,8 @@ inline std::string describe_failure(const GwsRun& run, const std::string& stdout
     return out;
 }
 
-inline GwsRun exec_gws(const std::vector<std::string>& args, const std::string& cwd = "") {
-    const char* bin_env = getenv("GWS_BIN");
+inline GwsRun exec_gws(const std::vector<std::string> &args, const std::string &cwd = "") {
+    const char *bin_env = getenv("GWS_BIN");
     std::string bin = (bin_env && *bin_env) ? bin_env : "gws";
 
     int raw_out[2]{-1, -1};
@@ -205,11 +212,11 @@ inline GwsRun exec_gws(const std::vector<std::string>& args, const std::string& 
 #endif
     }
 
-    std::vector<char*> argv_ptrs;
+    std::vector<char *> argv_ptrs;
     argv_ptrs.reserve(args.size() + 2);
-    argv_ptrs.push_back(const_cast<char*>(bin.c_str()));
-    for (const auto& a : args) {
-        argv_ptrs.push_back(const_cast<char*>(a.c_str()));
+    argv_ptrs.push_back(const_cast<char *>(bin.c_str()));
+    for (const auto &a : args) {
+        argv_ptrs.push_back(const_cast<char *>(a.c_str()));
     }
     argv_ptrs.push_back(nullptr);
 
@@ -237,18 +244,23 @@ inline GwsRun exec_gws(const std::vector<std::string>& args, const std::string& 
     while (open_fds > 0) {
         int poll_res = poll(fds, 2, -1);
         if (poll_res < 0) {
-            if (errno == EINTR) continue;
+            if (errno == EINTR)
+                continue;
             break;
         }
         for (int i = 0; i < 2; ++i) {
             if (fds[i].fd >= 0 && (fds[i].revents & (POLLIN | POLLHUP | POLLERR))) {
                 ssize_t n = read(fds[i].fd, buf, sizeof(buf));
                 if (n > 0) {
-                    if (i == 0) stdout_str.append(buf, static_cast<size_t>(n));
-                    else stderr_str.append(buf, static_cast<size_t>(n));
+                    if (i == 0)
+                        stdout_str.append(buf, static_cast<size_t>(n));
+                    else
+                        stderr_str.append(buf, static_cast<size_t>(n));
                 } else {
-                    if (i == 0) out_read.reset();
-                    else err_read.reset();
+                    if (i == 0)
+                        out_read.reset();
+                    else
+                        err_read.reset();
                     fds[i].fd = -1;
                     open_fds--;
                 }
@@ -257,7 +269,8 @@ inline GwsRun exec_gws(const std::vector<std::string>& args, const std::string& 
     }
 
     int status = 0;
-    while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {}
+    while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {
+    }
 
     GwsRun result;
     if (WIFEXITED(status)) {
@@ -265,7 +278,7 @@ inline GwsRun exec_gws(const std::vector<std::string>& args, const std::string& 
     } else if (WIFSIGNALED(status)) {
         result.exitCode = -1;
         int sig = WTERMSIG(status);
-        const char* sigName = strsignal(sig);
+        const char *sigName = strsignal(sig);
         if (sigName) {
             result.signal = sigName;
         } else {
@@ -280,10 +293,9 @@ inline GwsRun exec_gws(const std::vector<std::string>& args, const std::string& 
 
 inline slimr::Json run_gws(
     GwsRunner runner,
-    const std::vector<std::string>& args,
+    const std::vector<std::string> &args,
     bool ndjson = false,
-    const std::string& cwd = ""
-) {
+    const std::string &cwd = "") {
     std::vector<std::string> full_args = profile_args();
     full_args.insert(full_args.end(), args.begin(), args.end());
 
@@ -311,9 +323,12 @@ inline slimr::Json run_gws(
             std::stringstream ss(stdoutTrimmed);
             std::string line;
             while (std::getline(ss, line)) {
-                while (!line.empty() && (line.front() == ' ' || line.front() == '\t' || line.front() == '\r')) line.erase(line.begin());
-                while (!line.empty() && (line.back() == ' ' || line.back() == '\t' || line.back() == '\r')) line.pop_back();
-                if (line.empty()) continue;
+                while (!line.empty() && (line.front() == ' ' || line.front() == '\t' || line.front() == '\r'))
+                    line.erase(line.begin());
+                while (!line.empty() && (line.back() == ' ' || line.back() == '\t' || line.back() == '\r'))
+                    line.pop_back();
+                if (line.empty())
+                    continue;
                 auto page = slimr::parse_json<slimr::Json>(line);
                 if (!page) {
                     throw GwsError("gws printed non-JSON output: " + (stdoutTrimmed.size() > 500 ? stdoutTrimmed.substr(0, 500) : stdoutTrimmed));
@@ -328,7 +343,7 @@ inline slimr::Json run_gws(
             throw GwsError("gws printed non-JSON output: " + (stdoutTrimmed.size() > 500 ? stdoutTrimmed.substr(0, 500) : stdoutTrimmed));
         }
         return *parsed;
-    } catch (const GwsError&) {
+    } catch (const GwsError &) {
         throw;
     } catch (...) {
         throw GwsError("gws printed non-JSON output: " + (stdoutTrimmed.size() > 500 ? stdoutTrimmed.substr(0, 500) : stdoutTrimmed));

@@ -20,7 +20,7 @@ struct GmailAttachment {
     slimr::Desc<int64_t, "Attachment size in bytes."> size{0};
     slimr::OptField<std::optional<std::string>, "Pass to gmail users.messages.attachments.get (with the message id) to download the bytes."> attachmentId;
 
-    bool operator==(const GmailAttachment& o) const = default;
+    bool operator==(const GmailAttachment &o) const = default;
 };
 
 struct GmailMessageSummary {
@@ -38,7 +38,7 @@ struct GmailMessageSummary {
     slimr::Desc<bool, "True when the body was cut to the character limit."> bodyTruncated{false};
     slimr::Desc<std::vector<GmailAttachment>, "Attachments (parts with a filename)."> attachments;
 
-    bool operator==(const GmailMessageSummary& o) const = default;
+    bool operator==(const GmailMessageSummary &o) const = default;
 };
 
 struct GmailHeader {
@@ -69,11 +69,16 @@ struct GmailRawMessage {
 };
 
 inline int b64_char_value(unsigned char c) {
-    if (c >= 'A' && c <= 'Z') return c - 'A';
-    if (c >= 'a' && c <= 'z') return c - 'a' + 26;
-    if (c >= '0' && c <= '9') return c - '0' + 52;
-    if (c == '+' || c == '-') return 62;
-    if (c == '/' || c == '_') return 63;
+    if (c >= 'A' && c <= 'Z')
+        return c - 'A';
+    if (c >= 'a' && c <= 'z')
+        return c - 'a' + 26;
+    if (c >= '0' && c <= '9')
+        return c - '0' + 52;
+    if (c == '+' || c == '-')
+        return 62;
+    if (c == '/' || c == '_')
+        return 63;
     return -1;
 }
 
@@ -83,9 +88,11 @@ inline std::string decode_base64url(std::string_view input) {
     uint32_t val = 0;
     int valb = -8;
     for (char c : input) {
-        if (c == '=') break;
+        if (c == '=')
+            break;
         int d = b64_char_value(static_cast<unsigned char>(c));
-        if (d == -1) continue;
+        if (d == -1)
+            continue;
         val = (val << 6) | d;
         valb += 6;
         if (valb >= 0) {
@@ -97,7 +104,7 @@ inline std::string decode_base64url(std::string_view input) {
 }
 
 inline std::string encode_base64url(std::string_view input) {
-    static const char* chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    static const char *chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     std::string out;
     size_t i = 0;
     while (i < input.size()) {
@@ -119,10 +126,11 @@ inline std::string encode_base64url(std::string_view input) {
     return out;
 }
 
-inline std::optional<std::string> header_value(const std::optional<std::vector<GmailHeader>>& headers, std::string_view name) {
-    if (!headers) return std::nullopt;
+inline std::optional<std::string> header_value(const std::optional<std::vector<GmailHeader>> &headers, std::string_view name) {
+    if (!headers)
+        return std::nullopt;
     std::string lower_name = to_lower(name);
-    for (const auto& h : *headers) {
+    for (const auto &h : *headers) {
         if (to_lower(h.name) == lower_name) {
             return h.value;
         }
@@ -130,8 +138,9 @@ inline std::optional<std::string> header_value(const std::optional<std::vector<G
     return std::nullopt;
 }
 
-inline std::vector<GmailAttachment> collect_attachments(const std::optional<GmailPart>& part) {
-    if (!part) return {};
+inline std::vector<GmailAttachment> collect_attachments(const std::optional<GmailPart> &part) {
+    if (!part)
+        return {};
     std::vector<GmailAttachment> list;
     if (part->filename.has_value() && !part->filename->empty()) {
         GmailAttachment att;
@@ -144,7 +153,7 @@ inline std::vector<GmailAttachment> collect_attachments(const std::optional<Gmai
         list.push_back(std::move(att));
     }
     if (part->parts) {
-        for (const auto& child : *part->parts) {
+        for (const auto &child : *part->parts) {
             auto sub = collect_attachments(child);
             list.insert(list.end(), sub.begin(), sub.end());
         }
@@ -152,7 +161,7 @@ inline std::vector<GmailAttachment> collect_attachments(const std::optional<Gmai
     return list;
 }
 
-inline std::string decode_part_body(const GmailPart& part) {
+inline std::string decode_part_body(const GmailPart &part) {
     std::string raw_data = part.body && part.body->data ? *part.body->data : "";
     std::string bytes = decode_base64url(raw_data);
     std::string ct = header_value(part.headers, "content-type").value_or("");
@@ -179,8 +188,9 @@ inline std::string decode_part_body(const GmailPart& part) {
     return bytes;
 }
 
-inline const GmailPart* find_body_part(const GmailPart* part, std::string_view mimeType) {
-    if (!part) return nullptr;
+inline const GmailPart *find_body_part(const GmailPart *part, std::string_view mimeType) {
+    if (!part)
+        return nullptr;
     bool is_match = part->mimeType.has_value() && *part->mimeType == mimeType;
     bool has_data = part->body.has_value() && part->body->data.has_value() && !part->body->data->empty();
     bool no_filename = !part->filename.has_value() || part->filename->empty();
@@ -190,18 +200,19 @@ inline const GmailPart* find_body_part(const GmailPart* part, std::string_view m
     }
 
     if (part->parts) {
-        for (const auto& child : *part->parts) {
-            const GmailPart* hit = find_body_part(&child, mimeType);
-            if (hit) return hit;
+        for (const auto &child : *part->parts) {
+            const GmailPart *hit = find_body_part(&child, mimeType);
+            if (hit)
+                return hit;
         }
     }
     return nullptr;
 }
 
-inline GmailMessageSummary summarize_message(const GmailRawMessage& message, size_t maxBodyChars) {
-    const GmailPart* payload_ptr = message.payload ? &(*message.payload) : nullptr;
-    const GmailPart* plain = find_body_part(payload_ptr, "text/plain");
-    const GmailPart* html = plain ? nullptr : find_body_part(payload_ptr, "text/html");
+inline GmailMessageSummary summarize_message(const GmailRawMessage &message, size_t maxBodyChars) {
+    const GmailPart *payload_ptr = message.payload ? &(*message.payload) : nullptr;
+    const GmailPart *plain = find_body_part(payload_ptr, "text/plain");
+    const GmailPart *html = plain ? nullptr : find_body_part(payload_ptr, "text/html");
 
     std::string body;
     std::string bodySource = "none";
@@ -211,7 +222,9 @@ inline GmailMessageSummary summarize_message(const GmailRawMessage& message, siz
         // Replace \r with empty
         std::string no_r;
         no_r.reserve(decoded.size());
-        for (char c : decoded) if (c != '\r') no_r.push_back(c);
+        for (char c : decoded)
+            if (c != '\r')
+                no_r.push_back(c);
 
         // Replace \n{3,} with \n\n
         static const std::regex multi_nl(R"RAW(\n{3,})RAW");

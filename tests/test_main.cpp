@@ -26,14 +26,17 @@ TEST_CASE("subprocess working directory is applied without invoking gws") {
     struct RestoreBinary {
         std::optional<std::string> previous;
         RestoreBinary() {
-            if (const char* value = getenv("GWS_BIN")) previous = value;
+            if (const char *value = getenv("GWS_BIN"))
+                previous = value;
             setenv("GWS_BIN", "/bin/pwd", 1);
         }
-        RestoreBinary(const RestoreBinary&) = delete;
-        RestoreBinary& operator=(const RestoreBinary&) = delete;
+        RestoreBinary(const RestoreBinary &) = delete;
+        RestoreBinary &operator=(const RestoreBinary &) = delete;
         ~RestoreBinary() {
-            if (previous) setenv("GWS_BIN", previous->c_str(), 1);
-            else unsetenv("GWS_BIN");
+            if (previous)
+                setenv("GWS_BIN", previous->c_str(), 1);
+            else
+                unsetenv("GWS_BIN");
         }
     } restore;
     const auto run = exec_gws({}, temp.path.string());
@@ -46,9 +49,9 @@ TEST_CASE("subprocess working directory is applied without invoking gws") {
 // Mock runner helper
 struct MockGws {
     std::vector<std::vector<std::string>> calls;
-    std::function<GwsRun(const std::vector<std::string>&, const std::string&)> reply;
+    std::function<GwsRun(const std::vector<std::string> &, const std::string &)> reply;
 
-    GwsRun operator()(const std::vector<std::string>& args, const std::string& cwd) {
+    GwsRun operator()(const std::vector<std::string> &args, const std::string &cwd) {
         calls.push_back(args);
         if (reply) {
             return reply(args, cwd);
@@ -57,7 +60,7 @@ struct MockGws {
     }
 
     GwsRunner runner() {
-        return [this](const std::vector<std::string>& args, const std::string& cwd) {
+        return [this](const std::vector<std::string> &args, const std::string &cwd) {
             return (*this)(args, cwd);
         };
     }
@@ -65,22 +68,23 @@ struct MockGws {
 
 const std::string NEWSLETTER = []() {
     std::string s = "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Weekly Update</title>\n"
-"<style type=\"text/css\">body{margin:0;padding:0} .btn{color:#fff;background:#06c}</style>\n"
-"<!--[if mso]><xml><o:OfficeDocumentSettings></o:OfficeDocumentSettings></xml><![endif]-->\n"
-"</head><body>\n"
-"<div style=\"color:#fff\">Your weekly roundup&#847;&zwnj;&nbsp;&#8203;&#8203;&#xFEFF;</div>\n"
-"<table role=\"presentation\" width=\"100%\"><tr><td align=\"center\">\n"
-"<table width=\"600\"><tr><td><h1>Hi Brian,</h1></td></tr>\n"
-"<tr><td><p>Here&rsquo;s what&#39;s new this week &mdash; 3 updates.</p></td></tr>\n"
-"<tr><td><a href=\"https://example.com/post?id=42&amp;utm_source=newsletter&amp;utm_medium=email\" class=\"btn\"><span>Read the post</span></a></td></tr>\n"
-"<tr><td><a href=\"https://click.example.com/ls/click?upn=" + std::string(400, 'x') + "\">View in browser</a></td></tr>\n"
-"<tr><td><a href=\"mailto:help@example.com\">Contact support</a> | <a href=\"https://example.com/u\"><img src=\"logo.png\"></a></td></tr>\n"
-"<tr><td>Price</td><td>&pound;10 &amp; &euro;12</td></tr>\n"
-"<tr><td><p>Unsubscribe</p></td></tr>\n"
-"<tr><td><p>Unsubscribe</p></td></tr>\n"
-"</table></td></tr></table>\n"
-"<script>track()</script>\n"
-"</body></html>";
+                    "<style type=\"text/css\">body{margin:0;padding:0} .btn{color:#fff;background:#06c}</style>\n"
+                    "<!--[if mso]><xml><o:OfficeDocumentSettings></o:OfficeDocumentSettings></xml><![endif]-->\n"
+                    "</head><body>\n"
+                    "<div style=\"color:#fff\">Your weekly roundup&#847;&zwnj;&nbsp;&#8203;&#8203;&#xFEFF;</div>\n"
+                    "<table role=\"presentation\" width=\"100%\"><tr><td align=\"center\">\n"
+                    "<table width=\"600\"><tr><td><h1>Hi Brian,</h1></td></tr>\n"
+                    "<tr><td><p>Here&rsquo;s what&#39;s new this week &mdash; 3 updates.</p></td></tr>\n"
+                    "<tr><td><a href=\"https://example.com/post?id=42&amp;utm_source=newsletter&amp;utm_medium=email\" class=\"btn\"><span>Read the post</span></a></td></tr>\n"
+                    "<tr><td><a href=\"https://click.example.com/ls/click?upn=" +
+                    std::string(400, 'x') + "\">View in browser</a></td></tr>\n"
+                                            "<tr><td><a href=\"mailto:help@example.com\">Contact support</a> | <a href=\"https://example.com/u\"><img src=\"logo.png\"></a></td></tr>\n"
+                                            "<tr><td>Price</td><td>&pound;10 &amp; &euro;12</td></tr>\n"
+                                            "<tr><td><p>Unsubscribe</p></td></tr>\n"
+                                            "<tr><td><p>Unsubscribe</p></td></tr>\n"
+                                            "</table></td></tr></table>\n"
+                                            "<script>track()</script>\n"
+                                            "</body></html>";
     return s;
 }();
 
@@ -330,7 +334,7 @@ TEST_SUITE("gws/client") {
 
     TEST_CASE("run_gws prepends profile flag and parses JSON") {
         MockGws gws;
-        gws.reply = [](const auto&, const auto&) {
+        gws.reply = [](const auto &, const auto &) {
             return GwsRun{.exitCode = 0, .stderrStr = "", .stdoutStr = "{\"ok\":1}"};
         };
         auto res = run_gws(gws.runner(), {"drive", "about", "get"});
@@ -342,7 +346,7 @@ TEST_SUITE("gws/client") {
 
     TEST_CASE("run_gws parses NDJSON pages") {
         MockGws gws;
-        gws.reply = [](const auto&, const auto&) {
+        gws.reply = [](const auto &, const auto &) {
             return GwsRun{.exitCode = 0, .stderrStr = "", .stdoutStr = "{\"p\":1}\n{\"p\":2}\n"};
         };
         auto res = run_gws(gws.runner(), {"x"}, true);
@@ -355,7 +359,7 @@ TEST_SUITE("gws/client") {
 
     TEST_CASE("run_gws returns {} for empty successful output") {
         MockGws gws;
-        gws.reply = [](const auto&, const auto&) {
+        gws.reply = [](const auto &, const auto &) {
             return GwsRun{.exitCode = 0, .stderrStr = "", .stdoutStr = ""};
         };
         auto res = run_gws(gws.runner(), {"x"});
@@ -365,35 +369,33 @@ TEST_SUITE("gws/client") {
 
     TEST_CASE("run_gws surfaces gws JSON API errors") {
         MockGws gws;
-        gws.reply = [](const auto&, const auto&) {
+        gws.reply = [](const auto &, const auto &) {
             return GwsRun{
                 .exitCode = 1,
                 .stderrStr = "Using keyring backend: keyring\nerror[api]: x",
-                .stdoutStr = "{\"error\":{\"code\":400,\"message\":\"Invalid id value\",\"reason\":\"invalidArgument\"}}"
-            };
+                .stdoutStr = "{\"error\":{\"code\":400,\"message\":\"Invalid id value\",\"reason\":\"invalidArgument\"}}"};
         };
         CHECK_THROWS_AS(run_gws(gws.runner(), {"x"}), GwsError);
         try {
             run_gws(gws.runner(), {"x"});
-        } catch (const GwsError& e) {
+        } catch (const GwsError &e) {
             CHECK(std::string(e.what()) == "gws error (400 invalidArgument): Invalid id value");
         }
     }
 
     TEST_CASE("run_gws falls back to stderr without keyring noise when killed") {
         MockGws gws;
-        gws.reply = [](const auto&, const auto&) {
+        gws.reply = [](const auto &, const auto &) {
             return GwsRun{
                 .exitCode = -1,
                 .signal = "SIGABRT",
                 .stderrStr = "Using keyring backend: keyring\nfatal runtime error: stack overflow",
-                .stdoutStr = ""
-            };
+                .stdoutStr = ""};
         };
         try {
             run_gws(gws.runner(), {"x"});
             CHECK(false);
-        } catch (const GwsError& e) {
+        } catch (const GwsError &e) {
             std::string msg = e.what();
             CHECK(msg.find("gws failed (signal SIGABRT): fatal runtime error: stack overflow") != std::string::npos);
         }
@@ -430,10 +432,9 @@ TEST_SUITE("call command") {
 
         auto args = build_call_args(input);
         CHECK(args == std::vector<std::string>{
-            "tasks", "tasks", "insert",
-            "--params", "{\"tasklist\":\"@default\"}",
-            "--json", "{\"title\":\"Buy milk\"}"
-        });
+                          "tasks", "tasks", "insert",
+                          "--params", "{\"tasklist\":\"@default\"}",
+                          "--json", "{\"title\":\"Buy milk\"}"});
     }
 
     TEST_CASE("build_call_args merges fields into params and omits empty params") {
@@ -506,7 +507,7 @@ TEST_SUITE("call command") {
 
     TEST_CASE("call command invokes gws with profile and returns parsed JSON") {
         MockGws gws;
-        gws.reply = [](const auto&, const auto&) {
+        gws.reply = [](const auto &, const auto &) {
             return GwsRun{.exitCode = 0, .stderrStr = "", .stdoutStr = "{\"messages\":[{\"id\":\"a\"}]}"};
         };
 
@@ -526,7 +527,7 @@ TEST_SUITE("call command") {
 
     TEST_CASE("call command wraps pageAll pages") {
         MockGws gws;
-        gws.reply = [](const auto&, const auto&) {
+        gws.reply = [](const auto &, const auto &) {
             return GwsRun{.exitCode = 0, .stderrStr = "", .stdoutStr = "{\"items\":[1]}\n{\"items\":[2]}"};
         };
 
@@ -544,7 +545,7 @@ TEST_SUITE("call command") {
 
     TEST_CASE("call command truncates oversized responses with fields hint") {
         MockGws gws;
-        gws.reply = [](const auto&, const auto&) {
+        gws.reply = [](const auto &, const auto &) {
             slimr::Json big = slimr::Json::object_t{};
             slimr::Json::array_t arr;
             for (int i = 0; i < 3000; ++i) {
@@ -616,7 +617,7 @@ TEST_SUITE("call command") {
         CHECK_THROWS_AS(call(in, gws.runner()), std::runtime_error);
         try {
             call(in, gws.runner());
-        } catch (const std::exception& e) {
+        } catch (const std::exception &e) {
             std::string msg = e.what();
             CHECK(msg.find("Blocked: gmail.users.messages.send") != std::string::npos);
             CHECK(msg.find("gdocsmith") != std::string::npos);
@@ -647,29 +648,43 @@ TEST_SUITE("drive-upload command") {
         std::string lib = (base / "home/Library/Caches/a.txt").string();
         std::string outside = (base / "outside.txt").string();
 
-        { std::ofstream(doc) << "x"; }
-        { std::ofstream(scratch) << "x"; }
-        { std::ofstream(key) << "x"; }
-        { std::ofstream(config) << "x"; }
-        { std::ofstream(hidden) << "x"; }
-        { std::ofstream(lib) << "x"; }
-        { std::ofstream(outside) << "x"; }
+        {
+            std::ofstream(doc) << "x";
+        }
+        {
+            std::ofstream(scratch) << "x";
+        }
+        {
+            std::ofstream(key) << "x";
+        }
+        {
+            std::ofstream(config) << "x";
+        }
+        {
+            std::ofstream(hidden) << "x";
+        }
+        {
+            std::ofstream(lib) << "x";
+        }
+        {
+            std::ofstream(outside) << "x";
+        }
 
         fs::create_symlink(key, base / "home/Documents/link");
         fs::create_symlink(doc, base / "home/.dotfile-link");
 
-        auto resolve_in = [&](const std::string& f) {
+        auto resolve_in = [&](const std::string &f) {
             return resolve_upload_path(f, home, {tmp});
         };
 
         CHECK(resolve_in(doc).ends_with("Documents/a.txt"));
         CHECK(resolve_in(scratch).ends_with("tmp/a.txt"));
 
-        auto check_err = [&](const std::string& f, std::string_view match_msg) {
+        auto check_err = [&](const std::string &f, std::string_view match_msg) {
             try {
                 resolve_in(f);
                 CHECK(false);
-            } catch (const std::exception& e) {
+            } catch (const std::exception &e) {
                 CHECK(std::string(e.what()).find(match_msg) != std::string::npos);
             }
         };
@@ -697,12 +712,13 @@ TEST_SUITE("drive-upload command") {
 
     TEST_CASE("ensure_folder_path reuses existing folders and creates missing ones") {
         MockGws gws;
-        gws.reply = [](const auto& args, const auto&) {
+        gws.reply = [](const auto &args, const auto &) {
             const auto offset = !args.empty() && args.front() == "--profile" ? 4u : 2u;
             std::string op = args.size() > offset ? args[offset] : "";
             if (op == "list") {
                 std::string full;
-                for (const auto& a : args) full += a + " ";
+                for (const auto &a : args)
+                    full += a + " ";
                 if (full.find("'Backups'") != std::string::npos) {
                     return GwsRun{.exitCode = 0, .stderrStr = "", .stdoutStr = "{\"files\":[{\"id\":\"f1\"}]}"};
                 }
@@ -715,10 +731,12 @@ TEST_SUITE("drive-upload command") {
         CHECK(folderId == "f2");
         CHECK(gws.calls.size() == 3);
         std::string call1Str;
-        for (const auto& a : gws.calls[1]) call1Str += a + " ";
+        for (const auto &a : gws.calls[1])
+            call1Str += a + " ";
         CHECK(call1Str.find("'personal-log' and 'f1' in parents") != std::string::npos);
         std::string call2Str;
-        for (const auto& a : gws.calls[2]) call2Str += a + " ";
+        for (const auto &a : gws.calls[2])
+            call2Str += a + " ";
         CHECK(call2Str.find("\"parents\":[\"f1\"]") != std::string::npos);
 
         // Empty path is root
@@ -729,20 +747,20 @@ TEST_SUITE("drive-upload command") {
 TEST_SUITE("gmail-attachment command") {
     TEST_CASE("fetch_attachment decodes base64url data and fails when empty") {
         MockGws gws;
-        gws.reply = [](const auto&, const auto&) {
+        gws.reply = [](const auto &, const auto &) {
             return GwsRun{
                 .exitCode = 0,
                 .stderrStr = "",
-                .stdoutStr = "{\"data\":\"" + encode_base64url("%PDF-1.4 hello?>") + "\"}"
-            };
+                .stdoutStr = "{\"data\":\"" + encode_base64url("%PDF-1.4 hello?>") + "\"}"};
         };
         CHECK(fetch_attachment(gws.runner(), "m1", "a1") == "%PDF-1.4 hello?>");
         std::string call0;
-        for (const auto& a : gws.calls[0]) call0 += a + " ";
+        for (const auto &a : gws.calls[0])
+            call0 += a + " ";
         CHECK(call0.find("attachments get --params {\"userId\":\"me\",\"messageId\":\"m1\",\"id\":\"a1\"}") != std::string::npos);
 
         MockGws emptyGws;
-        emptyGws.reply = [](const auto&, const auto&) {
+        emptyGws.reply = [](const auto &, const auto &) {
             return GwsRun{.exitCode = 0, .stderrStr = "", .stdoutStr = "{}"};
         };
         CHECK_THROWS_WITH(fetch_attachment(emptyGws.runner(), "m1", "a1"), "Gmail returned no attachment data.");
@@ -757,7 +775,8 @@ TEST_SUITE("gmail-attachment command") {
         CHECK(sanitize_filename("...") == "attachment");
         std::string null_in = "a<b>:c|d";
         null_in.push_back('\0');
-        null_in += "e\xe2\x80\xae" "gpj.exe";
+        null_in += "e\xe2\x80\xae"
+                   "gpj.exe";
         CHECK(sanitize_filename(null_in) == "a_b__c_d_e_gpj.exe");
         CHECK(sanitize_filename("") == "attachment");
         CHECK(sanitize_filename("/") == "attachment");
@@ -769,7 +788,7 @@ TEST_SUITE("gmail-attachment command") {
 
     TEST_CASE("assert_message_id accepts alphanumeric and refuses others") {
         CHECK_NOTHROW(assert_message_id("19a1b6731c6fdd2af"));
-        for (const auto& bad : {"", "../x", "a/b", "a b", "a.b", "a-b"}) {
+        for (const auto &bad : {"", "../x", "a/b", "a b", "a.b", "a-b"}) {
             CHECK_THROWS(assert_message_id(bad));
         }
     }
@@ -785,8 +804,12 @@ TEST_SUITE("gmail-attachment command") {
         CHECK(third == (root / "m1/doc-2.txt").string());
 
         std::string read1, read2;
-        { std::ifstream(first) >> read1; }
-        { std::ifstream(second) >> read2; }
+        {
+            std::ifstream(first) >> read1;
+        }
+        {
+            std::ifstream(second) >> read2;
+        }
         CHECK(read1 == "one");
         CHECK(read2 == "two");
 
@@ -820,15 +843,14 @@ TEST_SUITE("gmail-message & gmail-thread commands") {
         payload["mimeType"] = "text/plain";
         payload["body"]["data"] = encode_base64url(text);
         payload["headers"] = slimr::Json::array_t{
-            slimr::Json::object_t{{"name", "Subject"}, {"value", "S " + id}}
-        };
+            slimr::Json::object_t{{"name", "Subject"}, {"value", "S " + id}}};
         j["payload"] = payload;
         return j;
     };
 
     TEST_CASE("gmail-message fetches format=full and returns readable summary") {
         MockGws gws;
-        gws.reply = [&](const auto&, const auto&) {
+        gws.reply = [&](const auto &, const auto &) {
             return GwsRun{.exitCode = 0, .stderrStr = "", .stdoutStr = slimr::write_json(make_msg("m1", "Hello"))};
         };
 
@@ -845,7 +867,7 @@ TEST_SUITE("gmail-message & gmail-thread commands") {
 
     TEST_CASE("gmail-thread summarizes every message in the thread") {
         MockGws gws;
-        gws.reply = [&](const auto&, const auto&) {
+        gws.reply = [&](const auto &, const auto &) {
             slimr::Json th = slimr::Json::object_t{};
             th["id"] = "t1";
             th["messages"] = slimr::Json::array_t{make_msg("m1", "one"), make_msg("m2", "two")};
@@ -865,7 +887,7 @@ TEST_SUITE("gmail-message & gmail-thread commands") {
 TEST_SUITE("schema command") {
     TEST_CASE("runs gws schema with optional --resolve-refs") {
         MockGws gws;
-        gws.reply = [](const auto&, const auto&) {
+        gws.reply = [](const auto &, const auto &) {
             return GwsRun{.exitCode = 0, .stderrStr = "", .stdoutStr = "{\"httpMethod\":\"GET\"}"};
         };
 
@@ -881,8 +903,10 @@ TEST_SUITE("schema command") {
         CHECK(res2["httpMethod"].get<std::string>() == "GET");
 
         auto p = profile_args();
-        auto call0 = p; call0.insert(call0.end(), {"schema", "tasks.tasks.list"});
-        auto call1 = p; call1.insert(call1.end(), {"schema", "tasks.tasks.list", "--resolve-refs"});
+        auto call0 = p;
+        call0.insert(call0.end(), {"schema", "tasks.tasks.list"});
+        auto call1 = p;
+        call1.insert(call1.end(), {"schema", "tasks.tasks.list", "--resolve-refs"});
         CHECK(gws.calls[0] == call0);
         CHECK(gws.calls[1] == call1);
     }
@@ -897,7 +921,7 @@ TEST_SUITE("schema command") {
 
     TEST_CASE("hints to drop resolve-refs when gws crashes on recursive schemas") {
         MockGws gws;
-        gws.reply = [](const auto&, const auto&) {
+        gws.reply = [](const auto &, const auto &) {
             return GwsRun{.exitCode = -1, .signal = "SIGABRT", .stderrStr = "stack overflow", .stdoutStr = ""};
         };
 
@@ -907,7 +931,7 @@ TEST_SUITE("schema command") {
         try {
             schema(in, gws.runner());
             CHECK(false);
-        } catch (const GwsError& e) {
+        } catch (const GwsError &e) {
             CHECK(std::string(e.what()).find("retry without it") != std::string::npos);
         }
     }
@@ -931,7 +955,7 @@ TEST_SUITE("PluginApp integration & MCP dispatch") {
         CHECK(!app.instructions.empty());
         CHECK(app.bugsink() != nullptr);
 
-        const auto& tools = app.tools();
+        const auto &tools = app.tools();
         CHECK(tools.contains("call"));
         CHECK(tools.contains("schema"));
         CHECK(tools.contains("gmail-message"));
@@ -943,7 +967,7 @@ TEST_SUITE("PluginApp integration & MCP dispatch") {
 
     TEST_CASE("MCP 2026-07-28 server/discover, tools/list, tools/call, and legacy initialize rejection") {
         MockGws gws;
-        gws.reply = [](const auto&, const auto&) {
+        gws.reply = [](const auto &, const auto &) {
             return GwsRun{.exitCode = 0, .stderrStr = "", .stdoutStr = "{\"profile\":\"bdombro\",\"version\":\"1.0.5\"}"};
         };
         auto app = make_google_gws_app(gws.runner());
@@ -1004,7 +1028,7 @@ TEST_SUITE("PluginApp integration & MCP dispatch") {
         {
             char arg0[] = "gws-mcp";
             char arg1[] = "status";
-            char* argv[] = {arg0, arg1};
+            char *argv[] = {arg0, arg1};
             CHECK(app.run(2, argv) == 0);
         }
 
@@ -1014,7 +1038,7 @@ TEST_SUITE("PluginApp integration & MCP dispatch") {
             char arg1[] = "http";
             char arg2[] = "--host";
             char arg3[] = "0.0.0.0";
-            char* argv[] = {arg0, arg1, arg2, arg3};
+            char *argv[] = {arg0, arg1, arg2, arg3};
             CHECK(app.run(4, argv) == 1);
         }
 
@@ -1024,7 +1048,7 @@ TEST_SUITE("PluginApp integration & MCP dispatch") {
             char arg1[] = "http";
             char arg2[] = "--port";
             char arg3[] = "0";
-            char* argv[] = {arg0, arg1, arg2, arg3};
+            char *argv[] = {arg0, arg1, arg2, arg3};
             CHECK(app.run(4, argv) == 1);
         }
 
@@ -1033,7 +1057,7 @@ TEST_SUITE("PluginApp integration & MCP dispatch") {
             char arg0[] = "gws-mcp";
             char arg1[] = "http";
             char arg2[] = "--bogus";
-            char* argv[] = {arg0, arg1, arg2};
+            char *argv[] = {arg0, arg1, arg2};
             CHECK(app.run(3, argv) == 2);
         }
     }
@@ -1046,45 +1070,52 @@ TEST_SUITE("PluginApp integration & MCP dispatch") {
         auto httpCall = [](uint16_t port,
                            std::string_view method,
                            std::string_view path,
-                           const std::vector<std::pair<std::string, std::string>>& headers,
+                           const std::vector<std::pair<std::string, std::string>> &headers,
                            std::string_view body) -> HttpReply {
             int rawFd = ::socket(AF_INET, SOCK_STREAM, 0);
-            if (rawFd < 0) return {};
+            if (rawFd < 0)
+                return {};
             detail::UniqueFd fd(rawFd);
             sockaddr_in addr{};
             addr.sin_family = AF_INET;
             addr.sin_port = htons(port);
             inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
-            if (::connect(fd.get(), reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
+            if (::connect(fd.get(), reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) != 0) {
                 return {};
             }
             bool hasHost = false;
             std::string req = std::string(method) + " " + std::string(path) + " HTTP/1.1\r\n";
-            for (const auto& [k, v] : headers) {
-                if (k == "Host") hasHost = true;
+            for (const auto &[k, v] : headers) {
+                if (k == "Host")
+                    hasHost = true;
                 req += k + ": " + v + "\r\n";
             }
-            if (!hasHost) req += "Host: 127.0.0.1:" + std::to_string(port) + "\r\n";
+            if (!hasHost)
+                req += "Host: 127.0.0.1:" + std::to_string(port) + "\r\n";
             req += "Connection: close\r\n";
-            if (!body.empty()) req += "Content-Length: " + std::to_string(body.size()) + "\r\n";
+            if (!body.empty())
+                req += "Content-Length: " + std::to_string(body.size()) + "\r\n";
             req += "\r\n";
             req.append(body);
 
             size_t sent = 0;
             while (sent < req.size()) {
                 ssize_t n = ::send(fd.get(), req.data() + sent, req.size() - sent, 0);
-                if (n <= 0) return {};
+                if (n <= 0)
+                    return {};
                 sent += static_cast<size_t>(n);
             }
             std::string raw;
             char buf[4096];
             for (;;) {
                 ssize_t n = ::recv(fd.get(), buf, sizeof(buf), 0);
-                if (n <= 0) break;
+                if (n <= 0)
+                    break;
                 raw.append(buf, static_cast<size_t>(n));
             }
             auto hdrEnd = raw.find("\r\n\r\n");
-            if (hdrEnd == std::string::npos) return {};
+            if (hdrEnd == std::string::npos)
+                return {};
             auto lineEnd = raw.find("\r\n");
             std::string statusLine = raw.substr(0, lineEnd);
             auto sp = statusLine.find(' ');
@@ -1098,7 +1129,8 @@ TEST_SUITE("PluginApp integration & MCP dispatch") {
                 {"MCP-Protocol-Version", "2026-07-28"},
                 {"Mcp-Method", std::string(m)},
             };
-            if (!name.empty()) h.emplace_back("Mcp-Name", std::string(name));
+            if (!name.empty())
+                h.emplace_back("Mcp-Name", std::string(name));
             return h;
         };
         auto makeReq = [](int id, std::string_view method, slimr::Json extra = slimr::Json::object_t{}) {
@@ -1114,16 +1146,16 @@ TEST_SUITE("PluginApp integration & MCP dispatch") {
         };
 
         std::atomic<int> runnerCalls{0};
-        auto app = make_google_gws_app([&runnerCalls](const std::vector<std::string>&, const std::string&) {
+        auto app = make_google_gws_app([&runnerCalls](const std::vector<std::string> &, const std::string &) {
             ++runnerCalls;
             return GwsRun{.exitCode = 0, .stderrStr = "", .stdoutStr = "{\"ok\":true}"};
         });
 
         slimr::McpHttpServer srv(app, slimr::HttpServerOptions{
-            .host = "127.0.0.1",
-            .port = 0,
-            .allowEphemeralPort = true,
-        });
+                                          .host = "127.0.0.1",
+                                          .port = 0,
+                                          .allowEphemeralPort = true,
+                                      });
         std::string err;
         REQUIRE(srv.start(&err));
         const uint16_t port = srv.boundPort();
@@ -1172,7 +1204,8 @@ TEST_SUITE("PluginApp integration & MCP dispatch") {
                 }
             });
         }
-        for (auto& th : threads) th.join();
+        for (auto &th : threads)
+            th.join();
         CHECK(okCount.load() == 4);
         CHECK(runnerCalls.load() == 4);
 

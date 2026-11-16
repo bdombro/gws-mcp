@@ -14,7 +14,8 @@ namespace gws {
 inline std::string to_lower(std::string_view s) {
     std::string out;
     out.reserve(s.size());
-    for (char c : s) out.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+    for (char c : s)
+        out.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
     return out;
 }
 
@@ -50,7 +51,7 @@ inline std::string codepoint_to_utf8(uint32_t cp) {
     return out;
 }
 
-inline const std::unordered_map<std::string, std::string>& get_html_entities() {
+inline const std::unordered_map<std::string, std::string> &get_html_entities() {
     static const std::unordered_map<std::string, std::string> ENTITIES = {
         {"amp", "&"},
         {"apos", "'"},
@@ -73,9 +74,9 @@ inline const std::unordered_map<std::string, std::string>& get_html_entities() {
     return ENTITIES;
 }
 
-inline std::string decode_entities(const std::string& text) {
+inline std::string decode_entities(const std::string &text) {
     static const std::regex entity_re(R"RAW(&(#x?[0-9a-fA-F]+|\w+);)RAW");
-    const auto& entities = get_html_entities();
+    const auto &entities = get_html_entities();
 
     std::string out;
     auto begin = std::sregex_iterator(text.begin(), text.end(), entity_re);
@@ -116,9 +117,10 @@ inline std::string decode_entities(const std::string& text) {
     return out;
 }
 
-inline std::string strip_utm(const std::string& href) {
+inline std::string strip_utm(const std::string &href) {
     size_t qpos = href.find('?');
-    if (qpos == std::string::npos) return href;
+    if (qpos == std::string::npos)
+        return href;
 
     std::string base = href.substr(0, qpos);
     size_t hash_pos = href.find('#', qpos);
@@ -133,30 +135,31 @@ inline std::string strip_utm(const std::string& href) {
         if (!param.starts_with("utm_")) {
             kept.push_back(param);
         }
-        if (amp == std::string::npos) break;
+        if (amp == std::string::npos)
+            break;
         start = amp + 1;
     }
 
-    if (kept.empty()) return base + fragment;
+    if (kept.empty())
+        return base + fragment;
     std::string new_query;
     for (size_t i = 0; i < kept.size(); ++i) {
-        if (i > 0) new_query += '&';
+        if (i > 0)
+            new_query += '&';
         new_query += kept[i];
     }
     return base + "?" + new_query + fragment;
 }
 
-inline const std::set<std::string>& get_void_tags() {
+inline const std::set<std::string> &get_void_tags() {
     static const std::set<std::string> VOID_TAGS = {
-        "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "wbr"
-    };
+        "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "wbr"};
     return VOID_TAGS;
 }
 
-inline const std::set<std::string>& get_zero_properties() {
+inline const std::set<std::string> &get_zero_properties() {
     static const std::set<std::string> ZERO_PROPERTIES = {
-        "font-size", "height", "max-height", "max-width", "opacity", "width"
-    };
+        "font-size", "height", "max-height", "max-width", "opacity", "width"};
     return ZERO_PROPERTIES;
 }
 
@@ -165,26 +168,31 @@ inline bool is_zero_value(std::string_view val) {
     return std::regex_match(val.begin(), val.end(), zero_re);
 }
 
-inline bool is_hidden(const std::string& attrs) {
+inline bool is_hidden(const std::string &attrs) {
     static const std::regex quoted_re(R"RAW("[^"]*"|'[^']*')RAW");
     std::string unquoted = std::regex_replace(attrs, quoted_re, "\"\"");
     static const std::regex hidden_attr_re(R"RAW((?:^|\s)hidden(?=[\s=/]|$))RAW", std::regex::icase);
-    if (std::regex_search(unquoted, hidden_attr_re)) return true;
+    if (std::regex_search(unquoted, hidden_attr_re))
+        return true;
 
     static const std::regex style_re(R"RAW((?:^|\s)style\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))RAW", std::regex::icase);
     std::smatch m;
-    if (!std::regex_search(attrs, m, style_re)) return false;
+    if (!std::regex_search(attrs, m, style_re))
+        return false;
 
     std::string raw_style;
-    if (m[1].matched) raw_style = m[1].str();
-    else if (m[2].matched) raw_style = m[2].str();
-    else if (m[3].matched) raw_style = m[3].str();
+    if (m[1].matched)
+        raw_style = m[1].str();
+    else if (m[2].matched)
+        raw_style = m[2].str();
+    else if (m[3].matched)
+        raw_style = m[3].str();
 
     std::string css = decode_entities(raw_style);
     static const std::regex comment_re(R"RAW(/\*[\s\S]*?\*/)RAW");
     css = std::regex_replace(css, comment_re, "");
 
-    const auto& zero_props = get_zero_properties();
+    const auto &zero_props = get_zero_properties();
     size_t start = 0;
     while (start < css.size()) {
         size_t semi = css.find(';', start);
@@ -197,17 +205,21 @@ inline bool is_hidden(const std::string& attrs) {
             val = std::regex_replace(val, important_re, "");
             val = to_lower(trim(val));
 
-            if (prop == "display" && val == "none") return true;
-            if (prop == "visibility" && (val == "hidden" || val == "collapse")) return true;
-            if (zero_props.contains(prop) && is_zero_value(val)) return true;
+            if (prop == "display" && val == "none")
+                return true;
+            if (prop == "visibility" && (val == "hidden" || val == "collapse"))
+                return true;
+            if (zero_props.contains(prop) && is_zero_value(val))
+                return true;
         }
-        if (semi == std::string::npos) break;
+        if (semi == std::string::npos)
+            break;
         start = semi + 1;
     }
     return false;
 }
 
-inline size_t element_end(const std::string& html, const std::string& name, size_t from) {
+inline size_t element_end(const std::string &html, const std::string &name, size_t from) {
     static const std::regex any_tag_re(R"RAW(<(\/?)([a-z][a-z0-9]*)\b((?:"[^"]*"|'[^']*'|[^>"'])*)>)RAW", std::regex::icase);
 
     auto begin = std::sregex_iterator(html.begin() + from, html.end(), any_tag_re);
@@ -217,7 +229,8 @@ inline size_t element_end(const std::string& html, const std::string& name, size
     for (auto it = begin; it != end; ++it) {
         std::smatch m = *it;
         std::string tag_name = to_lower(m[2].str());
-        if (tag_name != name) continue;
+        if (tag_name != name)
+            continue;
 
         bool is_close = (m[1].length() > 0);
         std::string full_match = m[0].str();
@@ -239,9 +252,9 @@ inline size_t element_end(const std::string& html, const std::string& name, size
     return html.size();
 }
 
-inline std::string drop_hidden_elements(const std::string& html) {
+inline std::string drop_hidden_elements(const std::string &html) {
     static const std::regex open_tag_re(R"RAW(<([a-z][a-z0-9]*)\b((?:"[^"]*"|'[^']*'|[^>"'])*)>)RAW", std::regex::icase);
-    const auto& void_tags = get_void_tags();
+    const auto &void_tags = get_void_tags();
     std::string out;
     size_t pos = 0;
 
@@ -251,7 +264,8 @@ inline std::string drop_hidden_elements(const std::string& html) {
     for (; it != end; ++it) {
         std::smatch m = *it;
         size_t m_index = m.position();
-        if (m_index < pos) continue;
+        if (m_index < pos)
+            continue;
 
         std::string name = to_lower(m[1].str());
         std::string attrs = m[2].str();
@@ -269,7 +283,7 @@ inline std::string drop_hidden_elements(const std::string& html) {
     return out;
 }
 
-inline std::string html_to_text(const std::string& html) {
+inline std::string html_to_text(const std::string &html) {
     // 1. Drop comments <!--...-->
     static const std::regex comment_re(R"RAW(<!--[\s\S]*?-->)RAW");
     std::string s = std::regex_replace(html, comment_re, "");
@@ -329,7 +343,9 @@ inline std::string html_to_text(const std::string& html) {
     // 10. Strip \r
     std::string no_r;
     no_r.reserve(s.size());
-    for (char c : s) if (c != '\r') no_r.push_back(c);
+    for (char c : s)
+        if (c != '\r')
+            no_r.push_back(c);
     s = std::move(no_r);
 
     // 11. Replace non-breaking spaces (\xc2\xa0) with regular spaces
@@ -366,13 +382,15 @@ inline std::string html_to_text(const std::string& html) {
         if (paras.empty() || p != paras.back()) {
             paras.push_back(p);
         }
-        if (p_end == std::string::npos) break;
+        if (p_end == std::string::npos)
+            break;
         p_start = p_end + 2;
     }
 
     std::string out;
     for (size_t i = 0; i < paras.size(); ++i) {
-        if (i > 0) out += "\n\n";
+        if (i > 0)
+            out += "\n\n";
         out += paras[i];
     }
     return trim(out);
