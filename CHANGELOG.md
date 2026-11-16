@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Re-enable direct CLI tool calls (`gws-mcp <tool> '{...}'`), now opt-in since `slimr-mcp` v0.1.4
 - Internal: upgrade to `slimr-mcp` v0.1.3 (`cpp-httplib`) and `slimr-bugsink` v0.1.2, dropping `libhv` and `slimr-curl`.
 - Internal: switch macOS builds to llvm@23 with static libc++ and symbol hiding.
 
