@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v2.2.0 - 2026-11-16
+
 - Internal: pin `slimr-mcp` v0.2.0 and `slimr-serve` v0.1.1 baselines and remove temporary `overlay-ports`.
 - Migrate to `slimr-serve` / `slimr-mcp` typed output schemas (`outputSchema` / `structuredContent`) and drop stdio `mcp` mode.
 - Re-enable direct CLI tool calls (`gws-mcp <tool> '{...}'`), now opt-in since `slimr-mcp` v0.1.4
