@@ -1,16 +1,16 @@
 class GwsMcp < Formula
   desc "Google Workspace MCP server and CLI wrapping the gws CLI"
   homepage "https://github.com/bdombro/gws-mcp"
-  version "2.0.0"
+  version "2.1.0"
 
   on_macos do
-    url "https://github.com/bdombro/gws-mcp/releases/download/v2.0.0/gws-mcp-arm64-macos.tar.gz"
-    sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+    url "https://github.com/bdombro/gws-mcp/releases/download/v2.1.0/gws-mcp-arm64-macos.tar.gz"
+    sha256 "6c7c5e91f241d0fb57f4a2382b2a2b6459ac3db12620df1f3238c9811af3167f"
   end
 
   on_linux do
-    url "https://github.com/bdombro/gws-mcp/releases/download/v2.0.0/gws-mcp-x64-linux.tar.gz"
-    sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+    url "https://github.com/bdombro/gws-mcp/releases/download/v2.1.0/gws-mcp-x64-linux.tar.gz"
+    sha256 "943bdc9227821335638e97de46e3a76ad98ccb482b2feb432a5b1383752414ae"
   end
 
   def install

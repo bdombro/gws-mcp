@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v2.1.0 - 2026-11-16
+
 - Embed VERSION into binary (`--version` / `status`) and tag Bugsink events with `gws-mcp@<version>`
 - Bind HTTP server to 0.0.0.0:10006 by default (pass --host 127.0.0.1 for loopback-only)
 - Add `--log-file` redirection and 10 MiB log rotation for the HTTP service
