@@ -941,7 +941,7 @@ TEST_SUITE("schema command") {
 TEST_SUITE("status command") {
     TEST_CASE("returns version and profile") {
         auto res = status({});
-        CHECK(res.version.get() == "2.0.0");
+        CHECK(res.version.get() == GWS_APP_VERSION);
         const auto expected = profile_args();
         CHECK(res.profile.get() == (expected.empty() ? "" : expected.back()));
     }
@@ -952,7 +952,7 @@ TEST_SUITE("PluginApp integration & MCP dispatch") {
         MockGws gws;
         auto app = make_google_gws_app(gws.runner());
         CHECK(app.key == "gws-mcp");
-        CHECK(app.version == "2.0.0");
+        CHECK(app.version == GWS_APP_VERSION);
         CHECK(!app.instructions.empty());
         CHECK(app.bugsink() != nullptr);
 
@@ -1017,7 +1017,7 @@ TEST_SUITE("PluginApp integration & MCP dispatch") {
         CHECK(callResp["result"]["isError"].get<bool>() == false);
         auto contents = callResp["result"]["content"].get<slimr::Json::array_t>();
         CHECK(contents.size() == 1);
-        CHECK(contents[0]["text"].get<std::string>().find("\"version\":\"2.0.0\"") != std::string::npos);
+        CHECK(contents[0]["text"].get<std::string>().find(std::string("\"version\":\"") + GWS_APP_VERSION + "\"") != std::string::npos);
     }
 
     TEST_CASE("CLI direct invocation and enable_http flag validation") {
