@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## v2.2.2 - 2026-11-17
+
+- feat: align cpp-templates, server-only CLI, and /tools HTTP surface (#1)
+  * build: guard release on VCPKG_OVERLAY_PORTS and update dev docs
+  * chore: align CI/CD workflows and contributing docs with cpp-templates
+  * docs: maintainer setup for release App, secrets, rulesets
+  * docs: soft alignment marker and release-bot contributing docs
+  * feat: server-only CLI and /tools HTTP surface
+  Convert the per-tool CLI test case in tests/test_main.cpp to assert rejection of per-tool CLI invocations and add /tools/* HTTP route assertions because per-tool CLI dispatch was removed in favor of /tools/<name>.
+  * build: bump slimr-serve v0.3.1 and slimr-mcp v0.2.2
+- chore: slow gh run watch polling to 30s
+
 - Drop per-tool CLI; expose default-on `POST /tools/<name>` and `GET /tools/openapi.json` HTTP tool routes.
 
 ## v2.2.1 - 2026-11-17
