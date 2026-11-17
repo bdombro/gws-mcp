@@ -178,7 +178,7 @@ On Linux (`ubuntu-24.04`), install `llvm@23` via Homebrew and enable lingering s
 - `src/client.hpp`: `posix_spawnp` + `poll()` subprocess runner for `gws`, stderr noise filter, 100 KB response cap.
 - `src/mime.hpp`: base64url decoder, Gmail MIME tree walker, charset converter, attachment extractor.
 - `src/html_to_text.hpp`: HTML-to-readable-text converter (strips hidden elements and UTM params).
-- `tests/test_main.cpp`: unit, mock-runner, CLI, MCP `2026-07-28`, and HTTP concurrency tests.
+- `tests/test_main.cpp`: unit, mock-runner, HTTP `/tools`, MCP `2026-07-28`, and HTTP concurrency tests.
 
 ## Dropped Tooling
 

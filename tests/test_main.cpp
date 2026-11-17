@@ -1026,20 +1026,21 @@ TEST_SUITE("PluginApp integration & MCP dispatch") {
         CHECK(contents[0]["text"].get<std::string>().find(std::string("\"version\":\"") + GWS_APP_VERSION + "\"") != std::string::npos);
     }
 
-    TEST_CASE("CLI direct invocation and enable_http flag validation") {
+    TEST_CASE("Server-only CLI rejects per-tool invocations and unknown flags") {
         MockGws gws;
         auto app = make_google_gws_app(gws.runner());
         slimr::enable_http(app, slimr::HttpServerOptions{.host = "127.0.0.1", .port = 10006});
 
-        // CLI status invocation
+        // Per-tool CLI invocation is rejected
         {
             char arg0[] = "gws-mcp";
             char arg1[] = "status";
-            char *argv[] = {arg0, arg1};
-            CHECK(app.run(2, argv) == 0);
+            char arg2[] = "{}";
+            char *argv[] = {arg0, arg1, arg2};
+            CHECK(app.run(3, argv) != 0);
         }
 
-        // Unknown HTTP flag returns usage error 2
+        // Unknown HTTP flags return usage error 2
         {
             char arg0[] = "gws-mcp";
             char arg1[] = "http";
@@ -1149,6 +1150,16 @@ TEST_SUITE("PluginApp integration & MCP dispatch") {
 
         // GET /mcp -> 405
         CHECK(httpCall(port, "GET", "/mcp", {}, "").status == 405);
+
+        // Root tool/OpenAPI routes return 404; /tools/* routes return 200
+        CHECK(httpCall(port, "GET", "/openapi.json", {}, "").status == 404);
+        CHECK(httpCall(port, "POST", "/status", {{"Content-Type", "application/json"}}, "{}").status == 404);
+        CHECK(httpCall(port, "GET", "/tools/openapi.json", {}, "").status == 200);
+        auto toolStatusRep = httpCall(port, "POST", "/tools/status", {{"Content-Type", "application/json"}}, "{}");
+        CHECK(toolStatusRep.status == 200);
+        auto toolStatusJson = slimr::parse_json<slimr::Json>(toolStatusRep.body);
+        REQUIRE(toolStatusJson.has_value());
+        CHECK((*toolStatusJson)["version"].get<std::string>() == GWS_APP_VERSION);
 
         // server/discover -> 200
         auto disc = httpCall(port, "POST", "/mcp", mcpHdrs("server/discover"), makeReq(1, "server/discover"));
