@@ -1,6 +1,6 @@
 # gws-mcp
 
-Google Workspace MCP server and CLI wrapping the official `gws` CLI.
+Google Workspace MCP server wrapping the official `gws` CLI.
 
 > **Client compatibility:** MCP **2026-07-28 only**; legacy clients cannot connect.
 
@@ -43,9 +43,9 @@ Add to `.mcp.json` (or `opencode.jsonc` with `"protocol": "2026-07-28"`):
 }
 ```
 
-Or invoke tools directly via CLI (`gws-mcp <tool> ['{"arg":"val"}']`).
+Or call tools directly over HTTP (`POST http://127.0.0.1:10006/tools/<name>`, enabled by default; `GET /tools/openapi.json` lists schemas).
 
-### Tools & CLI Commands
+### Tools
 
 | Tool | Mutating | Description |
 | --- | --- | --- |
@@ -59,15 +59,16 @@ Or invoke tools directly via CLI (`gws-mcp <tool> ['{"arg":"val"}']`).
 
 ```bash
 # List 5 unread Gmail messages with partial response mask
-gws-mcp call '{"service":"gmail","resource":["users","messages"],"method":"list","params":{"userId":"me","q":"is:unread","maxResults":5},"fields":"messages(id,threadId)"}'
+curl -sS -X POST http://127.0.0.1:10006/tools/call -H 'Content-Type: application/json' \
+  -d '{"service":"gmail","resource":["users","messages"],"method":"list","params":{"userId":"me","q":"is:unread","maxResults":5},"fields":"messages(id,threadId)"}'
 
 # Read a Gmail message or thread
-gws-mcp gmail-message '{"id":"1a1b6731c6fdd2af"}'
-gws-mcp gmail-thread '{"id":"1a1b6731c6fdd2af"}'
+curl -sS -X POST http://127.0.0.1:10006/tools/gmail-message -H 'Content-Type: application/json' -d '{"id":"1a1b6731c6fdd2af"}'
+curl -sS -X POST http://127.0.0.1:10006/tools/gmail-thread -H 'Content-Type: application/json' -d '{"id":"1a1b6731c6fdd2af"}'
 
 # Inspect a schema or upload a file to Drive
-gws-mcp schema '{"method":"tasks.tasks.insert"}'
-gws-mcp drive-upload '{"file":"/absolute/path/to/invoice.pdf","folderPath":"Receipts/2026"}'
+curl -sS -X POST http://127.0.0.1:10006/tools/schema -H 'Content-Type: application/json' -d '{"method":"tasks.tasks.insert"}'
+curl -sS -X POST http://127.0.0.1:10006/tools/drive-upload -H 'Content-Type: application/json' -d '{"file":"/absolute/path/to/invoice.pdf","folderPath":"Receipts/2026"}'
 ```
 
 ## Safety Rules
@@ -89,4 +90,4 @@ Configure service environment variables in `$(brew --prefix)/etc/gws-mcp/env` (`
 
 ## Development
 
-See [docs/development.md](docs/development.md) for local builds, testing, and releases.
+See [docs/contributing.md](docs/contributing.md) for local builds, testing, and releases.

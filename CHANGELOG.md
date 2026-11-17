@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Drop per-tool CLI; expose default-on `POST /tools/<name>` and `GET /tools/openapi.json` HTTP tool routes.
+
 ## v2.2.1 - 2026-11-17
 
 - Pin `slimr-mcp` v0.2.1 and `slimr-serve` v0.3.0 (OpenAPI 3.1 `GET /openapi.json` / `--openapi` and `127.0.0.1` default bind).
