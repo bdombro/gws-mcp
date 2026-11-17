@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Pin `slimr-mcp` v0.2.1 and `slimr-serve` v0.3.0 (OpenAPI 3.1 `GET /openapi.json` / `--openapi` and `127.0.0.1` default bind).
+- Internal: update `test-mcp.ts` to verify `GET /openapi.json` and document `overlay-ports` in `docs/development.md`.
+
 ## v2.2.0 - 2026-11-16
 
 - Internal: pin `slimr-mcp` v0.2.0 and `slimr-serve` v0.1.1 baselines and remove temporary `overlay-ports`.

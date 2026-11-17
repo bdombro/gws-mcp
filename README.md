@@ -28,7 +28,7 @@ brew services start gws-mcp
 brew services info gws-mcp
 ```
 
-The HTTP server binds `0.0.0.0:10006` (`http://127.0.0.1:10006/mcp` locally), stores service state under `$(brew --prefix)/var/gws-mcp`, and logs to `$(brew --prefix)/var/log/gws-mcp.log` (rotated at 10 MiB, keeping one `.1`).
+The HTTP server binds `127.0.0.1:10006` (`http://127.0.0.1:10006/mcp`; pass `--host 0.0.0.0` to expose), stores service state under `$(brew --prefix)/var/gws-mcp`, and logs to `$(brew --prefix)/var/log/gws-mcp.log` (rotated at 10 MiB, keeping one `.1`).
 
 Add to `.mcp.json` (or `opencode.jsonc` with `"protocol": "2026-07-28"`):
 
