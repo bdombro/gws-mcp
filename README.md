@@ -89,4 +89,4 @@ Configure service environment variables in `$(brew --prefix)/etc/gws-mcp/env` (`
 
 ## Development
 
-See [docs/development.md](docs/development.md) for local builds, testing, and releases.
+See [docs/contributing.md](docs/contributing.md) for local builds, testing, and releases.
